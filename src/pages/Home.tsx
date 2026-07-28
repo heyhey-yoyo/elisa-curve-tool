@@ -1,4 +1,4 @@
-// ELISA_REVIEW_FIXES_20260728
+// ELISA_HEADER_SKIN_20260728
 import { useMemo, useRef, useState } from 'react'
 import {
   ComposedChart,
@@ -12,7 +12,7 @@ import {
   ReferenceLine,
   ReferenceArea,
 } from 'recharts'
-import { FlaskConical, Plus, Trash2, Sparkles, Eraser, Calculator, Info, Pencil, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Copy, Check } from 'lucide-react'
+import { Plus, Trash2, Sparkles, Eraser, Calculator, Info, Pencil, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Copy, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -355,15 +355,17 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100">
-      {/* 头部 */}
-      <header className="border-b bg-white/80 backdrop-blur">
-        <div className="max-w-7xl mx-auto px-3 sm:px-4 py-3 sm:py-4 flex items-center gap-2 sm:gap-3">
-          <div className="p-1.5 sm:p-2 rounded-lg bg-teal-600 text-white shrink-0">
-            <FlaskConical className="w-5 h-5 sm:w-6 sm:h-6" />
+    <div className="min-h-screen bg-[#F7F4EE]">
+      {/* 头部：极简学术风品牌栏 */}
+      <header className="border-b border-slate-200/80 bg-white/70 backdrop-blur">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 py-3 sm:py-4 flex items-center gap-3 sm:gap-4">
+          <div className="shrink-0 leading-none">
+            <span className="font-serif text-lg sm:text-xl font-semibold tracking-tight text-slate-900">YDchen</span>
+            <span className="ml-1.5 text-lg sm:text-xl font-light text-slate-400">Tools</span>
           </div>
+          <div className="w-px h-8 sm:h-9 bg-slate-300/80 shrink-0" aria-hidden="true" />
           <div className="min-w-0">
-            <h1 className="text-base sm:text-xl font-bold text-slate-800 leading-tight">ELISA 四参数 Logistic 曲线拟合</h1>
+            <h1 className="text-base sm:text-lg font-semibold text-slate-800 leading-tight">ELISA 4PL Curve Tool</h1>
             <p className="text-xs sm:text-sm text-slate-500 mt-0.5">4PL 标曲拟合 · 浓度计算 · 96 孔板换算</p>
           </div>
         </div>

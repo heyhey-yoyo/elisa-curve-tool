@@ -102,7 +102,7 @@ export default function Home() {
   const [selectedCell, setSelectedCell] = useState<{ r: number; c: number } | null>(null)
   /** 孔板录入模式：格内输入的内容（默认 OD） */
   const [entryMode, setEntryMode] = useState<'od' | 'group' | 'dilution'>('od')
-  const [heatMap, setHeatMap] = useState(true)
+  const [heatMap, setHeatMap] = useState(false)
   const [copiedMode, setCopiedMode] = useState<'concentration' | 'group-concentration' | null>(null)
   const odBoardRef = useRef<HTMLDivElement>(null)
   const concBoardRef = useRef<HTMLDivElement>(null)

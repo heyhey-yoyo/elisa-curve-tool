@@ -112,6 +112,23 @@ describe('fitFourPL', () => {
     expect(res!.converged).toBe(false)
     expect(res!.reason).toBe('max-iterations')
   })
+
+  it('浅斜率曲线（b≈0.32，采样未覆盖两端）正常收敛且 EC50 不漂移', () => {
+    const res = fitFourPL(makeCurve({ a: 2.0, b: 0.32, c: 50, d: 0.1 }, [0.38, 3.8, 38, 380, 1810]))
+    expect(res).not.toBeNull()
+    expect(res!.converged).toBe(true)
+    expect(res!.reason).toBe('tolerance')
+    expect(res!.rSquared).toBeGreaterThan(0.999)
+    // EC50 不允许漂到天文数字（数据最大浓度 1810）
+    expect(res!.params.c).toBeLessThan(1e8)
+  })
+
+  it('极小 OD 尺度（1e-7）下经 OD 归一化仍正常收敛', () => {
+    const res = fitFourPL(makeCurve({ a: 2e-7, b: 1.2, c: 50, d: 5e-9 }, CONCS))
+    expect(res).not.toBeNull()
+    expect(res!.converged).toBe(true)
+    expect(res!.params.c).toBeCloseTo(50, 0)
+  })
 })
 
 describe('standardsSignature（标准品修改后拟合失效）', () => {

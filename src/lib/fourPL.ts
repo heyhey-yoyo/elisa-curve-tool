@@ -52,7 +52,8 @@ export function fourPL(x: number, p: FourPLParams): number {
 
 /** 4PL 反函数: 由 OD 求浓度；超出渐近线区间返回 null */
 export function fourPLInverse(y: number, p: FourPLParams): number | null {
-  const ratio = (p.a - p.d) / (y - p.d) - 1
+  // 与 (a-d)/(y-d) - 1 等价的写法，避免 y 接近 a 时的灾难性抵消
+  const ratio = (p.a - y) / (y - p.d)
   if (!isFinite(ratio) || ratio <= 0) return null
   const x = p.c * Math.pow(ratio, 1 / p.b)
   return isFinite(x) ? x : null
@@ -147,13 +148,24 @@ function solve4(A: number[][], b: number[]): number[] | null {
  * 要求至少 5 个不同的浓度水平（复孔不计入），否则返回 null。
  */
 export function fitFourPL(points: StandardPoint[]): FitResult | null {
-  const valid = points.filter((p) => p.conc > 0 && isFinite(p.od))
+  const valid = points.filter((p) => isFinite(p.conc) && p.conc > 0 && isFinite(p.od))
   // 检查不同浓度的数量，复孔不能当作新的浓度水平
   const uniqueConcs = new Set(valid.map((p) => p.conc))
   if (uniqueConcs.size < 5) return null
 
-  const logXs = valid.map((p) => Math.log(p.conc))
-  const ys = valid.map((p) => p.od)
+  // 将 OD 归一化到 O(1) 量级再拟合，避免 OD 尺度过小 / 过大导致数值问题。
+  // 4PL 对 a、d 是线性的，拟合结束后将 a、d 按比例还原即可（b、c 不受影响）
+  const yScale = Math.max(...valid.map((p) => Math.abs(p.od)), 1e-300)
+  const scaled = valid.map((p) => ({ conc: p.conc, od: p.od / yScale }))
+
+  const logXs = scaled.map((p) => Math.log(p.conc))
+  const ys = scaled.map((p) => p.od)
+  const lo = Math.min(...logXs)
+  const hi = Math.max(...logXs)
+  // logC 的允许范围：数据对数浓度范围向两端各扩一个数据跨度，
+  // 防止采样未覆盖曲线两端时 EC50 漂移到无意义的量级
+  const logCLo = lo - (hi - lo)
+  const logCHi = hi + (hi - lo)
 
   const sse = (qq: [number, number, number, number]) => {
     let s = 0
@@ -185,26 +197,41 @@ export function fitFourPL(points: StandardPoint[]): FitResult | null {
           for (let n = 0; n < 4; n++) JtJ[m][n] += J[i][m] * J[i][n]
         }
       }
+      // 梯度收敛判据（无量纲）：接近驻点时即便 SSE 仍在缓慢改善也视为收敛，
+      // 避免参数沿平坦山脊漂移导致好拟合被误判为 max-iterations。
+      // 要求正规方程可解（参数可辨识）：平坦数据等 b/c 不可辨识的情形不适用此判据
+      const gradInf = Math.max(Math.abs(Jtr[0]), Math.abs(Jtr[1]), Math.abs(Jtr[2]), Math.abs(Jtr[3]))
+      const diagMax = Math.max(JtJ[0][0], JtJ[1][1], JtJ[2][2], JtJ[3][3])
+      if (gradInf <= 1e-6 * Math.sqrt(diagMax * current + 1e-300) && solve4(JtJ, Jtr) !== null) {
+        reason = 'tolerance'
+        break
+      }
       let stepped = false
-      let sawSingular = false
       let done = false
+      // 内层循环最终的退出原因（奇异 / 无改善），用于准确报告 reason
+      let innerExit: FitReason = 'no-improvement'
       for (let tries = 0; tries < 60; tries++) {
         const A = JtJ.map((row, m) => row.map((v, n) => (m === n ? v * (1 + lambda) : v)))
         const delta = solve4(A, Jtr)
         if (!delta) {
-          sawSingular = true
           lambda *= 10
-          if (lambda > 1e15) break
+          if (lambda > 1e15) {
+            innerExit = 'singular'
+            break
+          }
           continue
         }
         const qNew = q.map((v, k) => v + delta[k]) as [number, number, number, number]
+        // 限制 logC 不漂出允许范围
+        qNew[2] = Math.min(Math.max(qNew[2], logCLo), logCHi)
         const sNew = sse(qNew)
         if (!isFinite(sNew)) {
           lambda *= 10
           if (lambda > 1e15) break
           continue
         }
-        const rel = (current - sNew) / (current + 1e-12)
+        // 纯相对改善判据，不依赖 OD 的绝对量级
+        const rel = (current - sNew) / Math.max(current, 1e-300)
         if (sNew <= current && rel < 1e-10) {
           // 改善已低于误差阈值，达到收敛容差
           q = qNew
@@ -225,7 +252,7 @@ export function fitFourPL(points: StandardPoint[]): FitResult | null {
       }
       if (done) break
       if (!stepped) {
-        reason = sawSingular ? 'singular' : 'no-improvement'
+        reason = innerExit
         break
       }
     }
@@ -233,13 +260,10 @@ export function fitFourPL(points: StandardPoint[]): FitResult | null {
   }
 
   // 多起点：自动初值 + 不同 c 位置 × 两个曲线方向 × 不同斜率（b 恒正）
-  const g = initialGuess(valid)
-  const ods = valid.map((p) => p.od)
+  const g = initialGuess(scaled)
+  const ods = scaled.map((p) => p.od)
   const minOD = Math.min(...ods)
   const maxOD = Math.max(...ods)
-  const logConcs = valid.map((p) => Math.log(p.conc))
-  const lo = Math.min(...logConcs)
-  const hi = Math.max(...logConcs)
 
   const starts: [number, number, number, number][] = [
     [g.a, Math.log(g.b), Math.log(g.c), g.d],
@@ -257,10 +281,20 @@ export function fitFourPL(points: StandardPoint[]): FitResult | null {
   let bestSSE = Infinity
   let bestReason: FitReason = 'no-improvement'
   let totalIter = 0
-  for (const s of starts) {
-    const { q, sse: s2, iter: it, reason } = lmRun(s)
-    totalIter += it
+  const runs = starts.map((s) => lmRun(s))
+  for (const r of runs) totalIter += r.iter
+  for (const { q, sse: s2, reason } of runs) {
     if (s2 < bestSSE) {
+      bestSSE = s2
+      bestQ = q
+      bestReason = reason
+    }
+  }
+  // 在与最优 SSE 相当（0.1% 以内）的启动中，优先取以 tolerance 正常收敛者，
+  // 避免最优启动恰好以 max-iterations 退出导致好拟合被整体误判为未收敛
+  for (const { q, sse: s2, reason } of runs) {
+    if (reason !== 'tolerance' || s2 > bestSSE * 1.001) continue
+    if (bestReason !== 'tolerance' || s2 < bestSSE) {
       bestSSE = s2
       bestQ = q
       bestReason = reason
@@ -268,17 +302,21 @@ export function fitFourPL(points: StandardPoint[]): FitResult | null {
   }
   if (!bestQ) return null
 
-  const params = toParams(bestQ)
+  // 还原 OD 归一化：a、d 按比例缩回原始量级，SSE / RMSE 同步还原
+  const fittedParams = toParams(bestQ)
+  const params: FourPLParams = { ...fittedParams, a: fittedParams.a * yScale, d: fittedParams.d * yScale }
+  const sseFinal = bestSSE * yScale * yScale
   const fitted = valid.map((p) => fourPL(p.conc, params))
   const residuals = valid.map((p, i) => p.od - fitted[i])
-  const meanY = ys.reduce((s, v) => s + v, 0) / ys.length
-  const ssTot = ys.reduce((s, v) => s + (v - meanY) ** 2, 0)
-  const rSquared = ssTot > 0 ? 1 - bestSSE / ssTot : 1
+  const meanY = valid.reduce((s, p) => s + p.od, 0) / valid.length
+  const ssTot = valid.reduce((s, p) => s + (p.od - meanY) ** 2, 0)
+  // 响应无变异（SST = 0）时 R² 在数学上无定义，返回 NaN 而非误导性的 1
+  const rSquared = ssTot > 0 ? 1 - sseFinal / ssTot : NaN
 
   return {
     params,
-    sse: bestSSE,
-    rmse: Math.sqrt(bestSSE / valid.length),
+    sse: sseFinal,
+    rmse: Math.sqrt(sseFinal / valid.length),
     rSquared,
     residuals,
     fitted,
@@ -288,9 +326,10 @@ export function fitFourPL(points: StandardPoint[]): FitResult | null {
   }
 }
 
-/** 生成用于绘图的平滑曲线点（对数等距） */
+/** 生成用于绘图的平滑曲线点（对数等距）；浓度范围非法时返回空数组 */
 export function curvePoints(p: FourPLParams, minConc: number, maxConc: number, n = 200) {
   const pts: { conc: number; od: number }[] = []
+  if (!(minConc > 0) || !(maxConc > 0) || maxConc <= minConc) return pts
   const lo = Math.log(minConc)
   const hi = Math.log(maxConc)
   for (let i = 0; i <= n; i++) {

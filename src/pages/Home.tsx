@@ -1,4 +1,4 @@
-// ELISA_HEADER_SKIN_20260728
+// ELISA_BUGFIXES_20260728
 import { useMemo, useRef, useState } from 'react'
 import {
   ComposedChart,
@@ -107,6 +107,8 @@ export default function Home() {
   const odBoardRef = useRef<HTMLDivElement>(null)
   const concBoardRef = useRef<HTMLDivElement>(null)
   const syncingRef = useRef(false)
+  /** 「已复制」状态的复位定时器 */
+  const copyTimerRef = useRef<number | null>(null)
   /** 96 孔 OD 录入格子的引用，用于键盘导航 */
   const odInputRefs = useRef(new Map<string, HTMLInputElement>())
   /** 上下孔板滚动同步 */
@@ -196,8 +198,14 @@ export default function Home() {
     () => plate.flat().map((v) => parseFloat(v.od)).filter(isFinite),
     [plate],
   )
-  const plateMin = plateOdValues.length ? Math.min(...plateOdValues) : 0
-  const plateMax = plateOdValues.length ? Math.max(...plateOdValues) : 1
+  // 热图编码值：有拟合时按浓度（越浓颜色越深），无拟合时退回按 OD 编码
+  const plateConcValues = useMemo(
+    () => plateResults.flat().filter((v): v is number => v !== null && isFinite(v)),
+    [plateResults],
+  )
+  const heatValues = fit && plateConcValues.length > 0 ? plateConcValues : plateOdValues
+  const plateMin = heatValues.length ? Math.min(...heatValues) : 0
+  const plateMax = heatValues.length ? Math.max(...heatValues) : 1
   // 绘图数据
   const chartData = useMemo(() => {
     if (!fit || stdPoints.pts.length === 0) return null
@@ -252,8 +260,18 @@ export default function Home() {
     }
   }
 
-  /** OD 录入键盘导航：方向键移动；Enter 下移一格，到底部则跳到下一列顶端 */
+  /** 孔位录入键盘导航：方向键移动；Enter 下移一格，到底部则跳到下一列顶端。
+   *  分组（自由文本）模式下只处理 Enter，方向键保留给文本光标 */
   const onOdCellKeyDown = (r: number, c: number) => (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (entryMode === 'group') {
+      if (e.key !== 'Enter') return
+      e.preventDefault()
+      const nr = r + 1 > 7 ? 0 : r + 1
+      const nc = r + 1 > 7 ? c + 1 : c
+      if (nc > 11) return
+      focusOdCell(nr, nc)
+      return
+    }
     let nr = r
     let nc = c
     if (e.key === 'ArrowUp') nr = r - 1
@@ -267,8 +285,9 @@ export default function Home() {
         nc = c + 1
       }
     } else return
-    e.preventDefault()
+    // 越界时不拦截按键，保留输入框内光标移动等默认行为
     if (nr < 0 || nr > 7 || nc < 0 || nc > 11) return
+    e.preventDefault()
     focusOdCell(nr, nc)
   }
 
@@ -277,10 +296,15 @@ export default function Home() {
     text: string,
     mode: 'concentration' | 'group-concentration',
   ) => {
+    // 先清掉上一次复制的复位定时器，避免提前清掉本次的「已复制」状态
+    if (copyTimerRef.current !== null) window.clearTimeout(copyTimerRef.current)
+    const markCopied = () => {
+      setCopiedMode(mode)
+      copyTimerRef.current = window.setTimeout(() => setCopiedMode(null), 2000)
+    }
     try {
       await navigator.clipboard.writeText(text)
-      setCopiedMode(mode)
-      window.setTimeout(() => setCopiedMode(null), 2000)
+      markCopied()
     } catch {
       const textarea = document.createElement('textarea')
       textarea.value = text
@@ -295,12 +319,23 @@ export default function Home() {
       document.body.removeChild(textarea)
 
       if (success) {
-        setCopiedMode(mode)
-        window.setTimeout(() => setCopiedMode(null), 2000)
+        markCopied()
       } else {
         window.alert('复制失败，请检查浏览器的剪贴板权限。')
       }
     }
+  }
+
+  /** 与结果板口径一致的浓度导出文本：范围内给数值；
+   *  无法计算 / 超出标准曲线范围给状态文本，不导出外推浓度 */
+  const exportConc = (r: number, c: number): string => {
+    const cell = plate[r][c]
+    const hasOd = isFinite(parseFloat(cell.od))
+    const v = plateResults[r][c]
+    if (v === null || !Number.isFinite(v)) return hasOd ? 'N/A' : ''
+    const status = sampleStatus(v / parseDil(cell.dilution))
+    if (status === 'valid') return v.toFixed(3)
+    return status === 'invalid' ? 'N/A' : status === 'below-range' ? '低于范围' : '高于范围'
   }
 
   /** 只复制浓度：粘贴后保持 8×12 孔板矩阵 */
@@ -308,14 +343,7 @@ export default function Home() {
     if (!fit) return
 
     const text = plateResults
-      .map((row) =>
-        row
-          .map((value) => {
-            if (value === null || !Number.isFinite(value)) return ''
-            return value.toFixed(3)
-          })
-          .join('\t'),
-      )
+      .map((row, r) => row.map((_, c) => exportConc(r, c)).join('\t'))
       .join('\n')
 
     await copyText(text, 'concentration')
@@ -339,15 +367,7 @@ export default function Home() {
         // 完全空白的孔不复制
         if (!group && !hasOd) continue
 
-        const value = plateResults[r][c]
-        const concentration =
-          value !== null && Number.isFinite(value)
-            ? value.toFixed(3)
-            : hasOd
-              ? 'N/A'
-              : ''
-
-        lines.push(`${group}\t${concentration}`)
+        lines.push(`${group}\t${exportConc(r, c)}`)
       }
     }
 
@@ -700,7 +720,8 @@ export default function Home() {
                               const outOfRange = raw !== null && (raw < minC || raw > maxC)
                               const uncomputable = isFinite(num) && fit && raw === null
                               const selected = selectedCell?.r === r && selectedCell?.c === c
-                              // 颜色始终按 OD 值编码；分组 / 倍数模式下空格用深色文字保证可读
+                              // 热图颜色按浓度编码（无拟合时退回 OD）；分组 / 倍数模式下空格用深色文字保证可读
+                              const heatValue = fit && plateResults[r][c] !== null ? (plateResults[r][c] as number) : num
                               const baseCls = !isFinite(num)
                                 ? entryMode === 'od'
                                   ? 'bg-white text-slate-300'
@@ -708,7 +729,7 @@ export default function Home() {
                                 : uncomputable || outOfRange
                                   ? 'bg-red-100 text-red-700 border-red-300'
                                   : heatMap
-                                    ? cellStyle(num, plateMin, plateMax)
+                                    ? cellStyle(heatValue, plateMin, plateMax)
                                     : 'bg-teal-50 text-teal-900'
                               return (
                                 <input

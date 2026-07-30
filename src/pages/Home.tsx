@@ -559,7 +559,7 @@ export default function Home() {
                               <Input value={r.dilution} onChange={(e) => updateUnk(i, 'dilution', e.target.value)} placeholder="1" className="h-8 w-16 sm:w-20" />
                             </td>
                             <td className="py-1 px-2 text-right font-mono font-semibold text-teal-700">
-                              {!fit ? '待拟合' : result.odInvalid ? 'OD 无效' : result.dilInvalid ? '稀释倍数无效' : result.status === 'valid' && result.conc !== null ? fmt(result.conc) : '—'}
+                              {result.odInvalid ? 'OD 无效' : result.dilInvalid ? '稀释倍数无效' : !fit ? '待拟合' : result.status === 'valid' && result.conc !== null ? fmt(result.conc) : '—'}
                             </td>
                             <td className="py-1 text-right">
                               {result.odInvalid ? (
@@ -842,28 +842,28 @@ export default function Home() {
                             let cls = 'bg-white text-slate-300 border-slate-200'
                             let text = '—'
                             let statusText = ''
-                            if (hasOdInput) {
-                              if (result.odInvalid) {
-                                cls = 'bg-red-100 text-red-700 border-red-300'
-                                text = 'OD 无效'
-                                statusText = 'OD 无效'
-                              } else if (result.dilInvalid) {
-                                cls = 'bg-red-100 text-red-700 border-red-300'
-                                text = '稀释倍数无效'
-                                statusText = '稀释倍数无效'
-                              } else if (!fit) {
-                                cls = 'bg-white text-slate-400'
-                                text = '待拟合'
-                                statusText = '待拟合'
+                            if (result.odInvalid) {
+                              cls = 'bg-red-100 text-red-700 border-red-300'
+                              text = 'OD 无效'
+                              statusText = 'OD 无效'
+                            } else if (result.dilInvalid) {
+                              cls = 'bg-red-100 text-red-700 border-red-300'
+                              text = '稀释倍数无效'
+                              statusText = '稀释倍数无效'
+                            } else if (!hasOdInput) {
+                              // 保持空白默认样式
+                            } else if (!fit) {
+                              cls = 'bg-white text-slate-400'
+                              text = '待拟合'
+                              statusText = '待拟合'
+                            } else {
+                              statusText = SAMPLE_STATUS_TEXT[result.status]
+                              if (result.status === 'valid' && result.conc !== null) {
+                                cls = 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                text = fmt(result.conc, 3)
                               } else {
-                                statusText = SAMPLE_STATUS_TEXT[result.status]
-                                if (result.status === 'valid' && result.conc !== null) {
-                                  cls = 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                                  text = fmt(result.conc, 3)
-                                } else {
-                                  cls = 'bg-red-100 text-red-700 border-red-300'
-                                  text = result.status === 'invalid' ? 'N/A' : result.status === 'below-range' ? '低于范围' : '高于范围'
-                                }
+                                cls = 'bg-red-100 text-red-700 border-red-300'
+                                text = result.status === 'invalid' ? 'N/A' : result.status === 'below-range' ? '低于范围' : '高于范围'
                               }
                             }
                             const selected = selectedCell?.r === r && selectedCell?.c === c

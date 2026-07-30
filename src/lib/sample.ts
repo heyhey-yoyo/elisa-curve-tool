@@ -121,13 +121,14 @@ export function computePlateResults(
       // 稀释倍数校验独立于拟合状态与 OD 有效性（纯输入校验）
       const df = parseDil(cell.dilution)
       const dilInvalid = cell.dilution.trim() !== '' && df === null
+      // adjOd 提前计算，与 computeUnkResult 口径一致
+      const adjOd = od !== null && blankSub ? od - blank : od
       if (!fit || od === null) {
-        return { status: 'invalid' as SampleStatus, raw: null, conc: null, dilInvalid, odInvalid, adjOd: null }
+        return { status: 'invalid' as SampleStatus, raw: null, conc: null, dilInvalid, odInvalid, adjOd }
       }
       const raw = computeRawConcentration(od, fit, blankSub, blank)
       const status = computeSampleStatus(raw, minC, maxC)
       const conc = status === 'valid' && raw !== null && df !== null ? raw * df : null
-      const adjOd = blankSub ? od - blank : od
       return { status, raw, conc, dilInvalid, odInvalid, adjOd }
     }),
   )

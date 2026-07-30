@@ -260,7 +260,7 @@ export function fitFourPL(points: StandardPoint[]): FitResult | null {
   /** 单次 LM 迭代，返回参数、SSE、迭代次数与结束原因 */
   const lmRun = (
     q0: [number, number, number, number],
-  ): { q: [number, number, number, number]; sse: number; iter: number; reason: FitReason } => {
+  ): { q: [number, number, number, number]; sse: number; reason: FitReason } => {
     let q = [...q0] as [number, number, number, number]
     let lambda = 1e-3
     let current = sse(q)
@@ -327,7 +327,7 @@ export function fitFourPL(points: StandardPoint[]): FitResult | null {
         break
       }
     }
-    return { q, sse: current, iter: iter + 1, reason }
+    return { q, sse: current, reason }
   }
 
   // 多起点：自动初值 + 不同 c 位置 × 两个曲线方向 × 不同斜率（b 恒正）

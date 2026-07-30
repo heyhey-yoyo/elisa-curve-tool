@@ -39,6 +39,8 @@ export interface WellResult {
   conc: number | null
   /** 稀释倍数是否非法（非空但解析失败） */
   dilInvalid: boolean
+  /** OD 是否非法（非空但解析失败，如 "abc"） */
+  odInvalid: boolean
   /** 调整后的 OD（减去空白后） */
   adjOd: number | null
 }
@@ -79,12 +81,14 @@ export function computeUnkResult(
   minC: number,
   maxC: number,
 ): WellResult {
-  const od = parseNumber(odStr)
+  const odTrim = odStr.trim()
+  const od = parseNumber(odTrim)
+  const odInvalid = odTrim !== '' && od === null
   const df = parseDil(dilutionStr)
   const adjOd = od !== null && blankSub ? od - blank : od
 
   if (od === null || !fit) {
-    return { status: 'invalid', raw: null, conc: null, dilInvalid: false, adjOd }
+    return { status: 'invalid', raw: null, conc: null, dilInvalid: false, odInvalid, adjOd }
   }
 
   const raw = computeRawConcentration(od, fit, blankSub, blank)
@@ -92,7 +96,7 @@ export function computeUnkResult(
   const dilInvalid = df === null
   const conc = status === 'valid' && raw !== null && df !== null ? raw * df : null
 
-  return { status, raw, conc, dilInvalid, adjOd }
+  return { status, raw, conc, dilInvalid, odInvalid, adjOd }
 }
 
 /**
@@ -110,9 +114,11 @@ export function computePlateResults(
 ): WellResult[][] {
   return plate.map((row) =>
     row.map((cell) => {
-      const od = parseNumber(cell.od)
+      const odStr = cell.od.trim()
+      const od = parseNumber(odStr)
+      const odInvalid = odStr !== '' && od === null
       if (!fit || od === null) {
-        return { status: 'invalid' as SampleStatus, raw: null, conc: null, dilInvalid: false, adjOd: null }
+        return { status: 'invalid' as SampleStatus, raw: null, conc: null, dilInvalid: false, odInvalid, adjOd: null }
       }
       const raw = computeRawConcentration(od, fit, blankSub, blank)
       const status = computeSampleStatus(raw, minC, maxC)
@@ -120,7 +126,7 @@ export function computePlateResults(
       const dilInvalid = df === null
       const conc = status === 'valid' && raw !== null && df !== null ? raw * df : null
       const adjOd = blankSub ? od - blank : od
-      return { status, raw, conc, dilInvalid, adjOd }
+      return { status, raw, conc, dilInvalid, odInvalid, adjOd }
     }),
   )
 }

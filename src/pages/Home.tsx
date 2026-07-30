@@ -253,9 +253,11 @@ export default function Home() {
     const hasOd = parseNumber(plate[r][c].od) !== null
     if (!hasOd) return ''
     if (result.dilInvalid) return '稀释倍数无效'
-    if (result.conc === null || !Number.isFinite(result.conc)) return 'N/A'
-    if (result.status === 'valid') return result.conc.toFixed(3)
-    return result.status === 'below-range' ? '低于范围' : '高于范围'
+    if (result.odInvalid) return 'OD 无效'
+    if (result.status === 'valid' && result.conc !== null) return result.conc.toFixed(3)
+    if (result.status === 'below-range') return '低于范围'
+    if (result.status === 'above-range') return '高于范围'
+    return 'N/A'
   }
 
   /** 只复制浓度：粘贴后保持 8×12 孔板矩阵 */
@@ -410,6 +412,12 @@ export default function Home() {
                       <span>D = {fmt(fit.params.d)}</span>
                       <span>标准曲线范围 {fmt(minC)} – {fmt(maxC)} {unit}</span>
                     </div>
+                    {fit.diagnostics.jacobianRankDeficient && (
+                      <p className="text-xs text-amber-600 mt-2 flex items-center gap-1">
+                        <Info className="w-3.5 h-3.5 shrink-0" />
+                        参数可辨识性存疑（Jacobian 近似奇异）；标准点可能未充分覆盖曲线两端，EC50 或渐近线估计不稳定。
+                      </p>
+                    )}
                   </div>
                   <Button variant="outline" size="sm" className="shrink-0" onClick={() => setStdsCollapsed(false)}>
                     <Pencil className="w-4 h-4 mr-1" />
@@ -540,6 +548,7 @@ export default function Home() {
                     <tbody>
                       {unkRows.map((r, i) => {
                         const od = parseNumber(r.od)
+                        const odInvalid = r.od.trim() !== '' && od === null
                         const df = parseDil(r.dilution)
                         const raw = od !== null && fit ? rawConc(od) : null
                         const status = od !== null && fit ? sampleStatus(raw) : null
@@ -558,10 +567,12 @@ export default function Home() {
                               <Input value={r.dilution} onChange={(e) => updateUnk(i, 'dilution', e.target.value)} placeholder="1" className="h-8 w-16 sm:w-20" />
                             </td>
                             <td className="py-1 px-2 text-right font-mono font-semibold text-teal-700">
-                              {!fit ? '待拟合' : od === null ? '—' : dilInvalid ? '稀释倍数无效' : conc !== null ? fmt(conc) : '—'}
+                              {!fit ? '待拟合' : odInvalid ? 'OD 无效' : od === null ? '—' : dilInvalid ? '稀释倍数无效' : conc !== null ? fmt(conc) : '—'}
                             </td>
                             <td className="py-1 text-right">
-                              {dilInvalid ? (
+                              {odInvalid ? (
+                                <Badge variant="destructive">OD 无效</Badge>
+                              ) : dilInvalid ? (
                                 <Badge variant="destructive">稀释倍数无效</Badge>
                               ) : status && (
                                 <Badge
@@ -646,17 +657,19 @@ export default function Home() {
                           <div key={r} className="flex gap-0.5 sm:gap-1 mb-0.5 sm:mb-1 items-center">
                             {row.map((cell, c) => {
                               const num = parseNumber(cell.od)
+                              const result = plateResults[r][c]
                               const raw = num !== null && fit ? rawConc(num) : null
                               const outOfRange = raw !== null && (raw < minC || raw > maxC)
                               const uncomputable = num !== null && fit && raw === null
+                              const hasError = result.dilInvalid || result.odInvalid
                               const selected = selectedCell?.r === r && selectedCell?.c === c
-                              // 热图颜色按浓度编码（无拟合时退回 OD）；分组 / 倍数模式下空格用深色文字保证可读
-                              const heatValue = fit && plateResults[r][c].conc !== null ? (plateResults[r][c].conc as number) : (num ?? 0)
+                              // 热图颜色按浓度编码（无拟合时退回 OD）；非法稀释倍数/OD 不进热图色阶
+                              const heatValue = fit && result.conc !== null && !hasError ? (result.conc as number) : (num ?? 0)
                               const baseCls = num === null
                                 ? entryMode === 'od'
                                   ? 'bg-white text-slate-300'
                                   : 'bg-white text-slate-700'
-                                : uncomputable || outOfRange
+                                : uncomputable || outOfRange || hasError
                                   ? 'bg-red-100 text-red-700 border-red-300'
                                   : heatMap
                                     ? cellStyle(heatValue, plateMin, plateMax)
@@ -729,7 +742,7 @@ export default function Home() {
                             />
                           </label>
                           <span className="font-mono text-sm font-semibold text-teal-700">
-                            浓度 = {!fit ? '待拟合' : !hasOd ? '—' : result.dilInvalid ? '稀释倍数无效' : result.status === 'valid' && result.conc !== null ? `${fmt(result.conc)} ${unit}` : SAMPLE_STATUS_TEXT[result.status]}
+                            浓度 = {!fit ? '待拟合' : !hasOd ? '—' : result.odInvalid ? 'OD 无效' : result.dilInvalid ? '稀释倍数无效' : result.status === 'valid' && result.conc !== null ? `${fmt(result.conc)} ${unit}` : SAMPLE_STATUS_TEXT[result.status]}
                           </span>
                         </div>
                         {/* 上下左右切换孔位 */}
@@ -834,7 +847,11 @@ export default function Home() {
                             let text = '—'
                             let statusText = ''
                             if (hasOd && fit) {
-                              if (result.dilInvalid) {
+                              if (result.odInvalid) {
+                                cls = 'bg-red-100 text-red-700 border-red-300'
+                                text = 'OD 无效'
+                                statusText = 'OD 无效'
+                              } else if (result.dilInvalid) {
                                 cls = 'bg-red-100 text-red-700 border-red-300'
                                 text = '稀释倍数无效'
                                 statusText = '稀释倍数无效'

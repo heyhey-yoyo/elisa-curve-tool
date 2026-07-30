@@ -50,8 +50,12 @@ src/
 │   │                 # 曲线点生成（curvePoints）、数字格式化（fmt）、
 │   │                 # 公式生成（formula）、EC50 位置诊断（FitDiagnostics）
 │   ├── fourPL.test.ts# 算法单元测试（Vitest）
+│   ├── parsing.test.ts# parseNumber / parseDil 测试
 │   ├── parsing.ts    # 严格数字解析：parseNumber / parseDil
-│   ├── standards.ts  # 标准品数据处理：deriveStandardPoints / validateStandards
+│   ├── standards.test.ts# validateStandardRows 测试
+│   ├── standards.ts  # 标准品数据处理：deriveStandardPoints / validateStandards /
+│   │                 # validateStandardRows
+│   ├── sample.test.ts# computePlateResults / computeUnkResult 测试
 │   ├── sample.ts     # 样本浓度计算：computeRawConcentration / computeSampleStatus /
 │   │                 # computePlateResults / computeChartUnkDots / computeBackCalc
 │   └── utils.ts      # cn() —— clsx + tailwind-merge（shadcn 约定）

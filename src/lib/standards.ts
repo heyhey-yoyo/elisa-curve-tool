@@ -59,11 +59,11 @@ export function validateStandardRows(stds: StdRow[], blankSub: boolean): string 
     if (concEmpty && !odEmpty) return `${row}：仅填写了 OD，未填写浓度`
     if (!concEmpty && odEmpty) return `${row}：仅填写了浓度，未填写 OD`
 
-    // 两项都填了，检查是否可解析
-    const concNum = Number(concTrim)
-    const odNum = Number(odTrim)
-    if (!isFinite(concNum)) return `${row}：浓度「${concTrim}」格式无效，请输入有效数字`
-    if (!isFinite(odNum)) return `${row}：OD「${odTrim}」格式无效，请输入有效数字`
+    // 两项都填了，检查是否可解析（统一使用 parseNumber，与数据层校验一致）
+    const concNum = parseNumber(concTrim)
+    const odNum = parseNumber(odTrim)
+    if (concNum === null) return `${row}：浓度「${concTrim}」格式无效，请输入有效数字`
+    if (odNum === null) return `${row}：OD「${odTrim}」格式无效，请输入有效数字`
 
     // 负数检查
     if (concNum < 0) return `${row}：浓度不能为负数（当前为 ${concNum}）`

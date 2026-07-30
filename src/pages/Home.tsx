@@ -19,9 +19,9 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { fitFourPL, fourPL, curvePoints, fmt, formula, FIT_REASON_TEXT, EC50_LOCATION_TEXT, type FitResult } from '@/lib/fourPL'
-import { parseNumber, parseDil } from '@/lib/parsing'
+import { parseNumber } from '@/lib/parsing'
 import { deriveStandardPoints, validateStandards, validateStandardRows, type StdRow } from '@/lib/standards'
-import { computeRawConcentration, computeSampleStatus, computePlateResults, computeChartUnkDots, computeBackCalc, SAMPLE_STATUS_TEXT, type SampleStatus, type UnkRow, type PlateCell, type WellResult } from '@/lib/sample'
+import { computeRawConcentration, computeUnkResult, computePlateResults, computeChartUnkDots, computeBackCalc, SAMPLE_STATUS_TEXT, type UnkRow, type PlateCell, type WellResult } from '@/lib/sample'
 
 const EXAMPLE_STDS: StdRow[] = [
   { conc: '2000', od: '2.512' },
@@ -121,7 +121,6 @@ export default function Home() {
 
   // 局部包装函数：从闭包中捕获当前 fit / blank / minC / maxC
   const rawConc = (od: number) => computeRawConcentration(od, fit, blankSub, stdPoints.blank)
-  const sampleStatus = (raw: number | null): SampleStatus => computeSampleStatus(raw, minC, maxC)
   // 96 孔板结果（统一 WellResult，包含浓度、状态、稀释倍数校验）
   const plateResults = useMemo(
     () => computePlateResults(plate, fit, blankSub, stdPoints.blank, minC, maxC),
@@ -547,14 +546,7 @@ export default function Home() {
                     </thead>
                     <tbody>
                       {unkRows.map((r, i) => {
-                        const od = parseNumber(r.od)
-                        const odInvalid = r.od.trim() !== '' && od === null
-                        const df = parseDil(r.dilution)
-                        const raw = od !== null && fit ? rawConc(od) : null
-                        const status = od !== null && fit ? sampleStatus(raw) : null
-                        const dilInvalid = od !== null && fit && df === null
-                        // 只有状态为「有效」且稀释倍数合法时才展示换算浓度
-                        const conc = status === 'valid' && raw !== null && df !== null ? raw * df : null
+                        const result = computeUnkResult(r.od, r.dilution, fit, blankSub, stdPoints.blank, minC, maxC)
                         return (
                           <tr key={i} className="border-b border-slate-100">
                             <td className="py-1 pr-2">
@@ -567,19 +559,19 @@ export default function Home() {
                               <Input value={r.dilution} onChange={(e) => updateUnk(i, 'dilution', e.target.value)} placeholder="1" className="h-8 w-16 sm:w-20" />
                             </td>
                             <td className="py-1 px-2 text-right font-mono font-semibold text-teal-700">
-                              {!fit ? '待拟合' : odInvalid ? 'OD 无效' : od === null ? '—' : dilInvalid ? '稀释倍数无效' : conc !== null ? fmt(conc) : '—'}
+                              {!fit ? '待拟合' : result.odInvalid ? 'OD 无效' : result.dilInvalid ? '稀释倍数无效' : result.status === 'valid' && result.conc !== null ? fmt(result.conc) : '—'}
                             </td>
                             <td className="py-1 text-right">
-                              {odInvalid ? (
+                              {result.odInvalid ? (
                                 <Badge variant="destructive">OD 无效</Badge>
-                              ) : dilInvalid ? (
+                              ) : result.dilInvalid ? (
                                 <Badge variant="destructive">稀释倍数无效</Badge>
-                              ) : od === null ? null : status && (
+                              ) : !fit ? null : (
                                 <Badge
-                                  variant={status === 'invalid' ? 'destructive' : status === 'valid' ? 'secondary' : 'secondary'}
-                                  className={status === 'valid' ? '' : status === 'invalid' ? '' : 'bg-amber-100 text-amber-700'}
+                                  variant={result.status === 'invalid' ? 'destructive' : result.status === 'valid' ? 'secondary' : 'secondary'}
+                                  className={result.status === 'valid' ? '' : result.status === 'invalid' ? '' : 'bg-amber-100 text-amber-700'}
                                 >
-                                  {SAMPLE_STATUS_TEXT[status]}
+                                  {SAMPLE_STATUS_TEXT[result.status]}
                                 </Badge>
                               )}
                             </td>
@@ -746,7 +738,7 @@ export default function Home() {
                             />
                           </label>
                           <span className="font-mono text-sm font-semibold text-teal-700">
-                            浓度 = {!fit ? '待拟合' : result.odInvalid ? 'OD 无效' : !hasOdInput ? '—' : result.dilInvalid ? '稀释倍数无效' : result.status === 'valid' && result.conc !== null ? `${fmt(result.conc)} ${unit}` : SAMPLE_STATUS_TEXT[result.status]}
+                            浓度 = {result.odInvalid ? 'OD 无效' : result.dilInvalid ? '稀释倍数无效' : !hasOdInput ? '—' : !fit ? '待拟合' : result.status === 'valid' && result.conc !== null ? `${fmt(result.conc)} ${unit}` : SAMPLE_STATUS_TEXT[result.status]}
                           </span>
                         </div>
                         {/* 上下左右切换孔位 */}
@@ -850,7 +842,7 @@ export default function Home() {
                             let cls = 'bg-white text-slate-300 border-slate-200'
                             let text = '—'
                             let statusText = ''
-                            if (hasOdInput && fit) {
+                            if (hasOdInput) {
                               if (result.odInvalid) {
                                 cls = 'bg-red-100 text-red-700 border-red-300'
                                 text = 'OD 无效'
@@ -859,6 +851,10 @@ export default function Home() {
                                 cls = 'bg-red-100 text-red-700 border-red-300'
                                 text = '稀释倍数无效'
                                 statusText = '稀释倍数无效'
+                              } else if (!fit) {
+                                cls = 'bg-white text-slate-400'
+                                text = '待拟合'
+                                statusText = '待拟合'
                               } else {
                                 statusText = SAMPLE_STATUS_TEXT[result.status]
                                 if (result.status === 'valid' && result.conc !== null) {

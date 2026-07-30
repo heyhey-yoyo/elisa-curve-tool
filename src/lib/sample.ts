@@ -84,16 +84,17 @@ export function computeUnkResult(
   const odTrim = odStr.trim()
   const od = parseNumber(odTrim)
   const odInvalid = odTrim !== '' && od === null
+  // 稀释倍数校验独立于 OD 和拟合状态
   const df = parseDil(dilutionStr)
+  const dilInvalid = dilutionStr.trim() !== '' && df === null
   const adjOd = od !== null && blankSub ? od - blank : od
 
   if (od === null || !fit) {
-    return { status: 'invalid', raw: null, conc: null, dilInvalid: false, odInvalid, adjOd }
+    return { status: 'invalid', raw: null, conc: null, dilInvalid, odInvalid, adjOd }
   }
 
   const raw = computeRawConcentration(od, fit, blankSub, blank)
   const status = computeSampleStatus(raw, minC, maxC)
-  const dilInvalid = df === null
   const conc = status === 'valid' && raw !== null && df !== null ? raw * df : null
 
   return { status, raw, conc, dilInvalid, odInvalid, adjOd }

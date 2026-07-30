@@ -39,3 +39,33 @@ export function validateStandards(pts: StandardPoint[]): string | null {
   }
   return null
 }
+
+/** 逐行校验标准品输入：只静默跳过双空行，其他问题返回具体错误 */
+export function validateStandardRows(stds: StdRow[]): string | null {
+  for (let i = 0; i < stds.length; i++) {
+    const { conc, od } = stds[i]
+    const row = `第 ${i + 1} 行`
+    const concTrim = conc.trim()
+    const odTrim = od.trim()
+    const concEmpty = concTrim === ''
+    const odEmpty = odTrim === ''
+
+    // 双空行：用户尚未填写，静默跳过
+    if (concEmpty && odEmpty) continue
+
+    // 仅填了一项
+    if (concEmpty && !odEmpty) return `${row}：仅填写了 OD，未填写浓度`
+    if (!concEmpty && odEmpty) return `${row}：仅填写了浓度，未填写 OD`
+
+    // 两项都填了，检查是否可解析
+    const concNum = Number(concTrim)
+    const odNum = Number(odTrim)
+    if (!isFinite(concNum)) return `${row}：浓度「${concTrim}」格式无效，请输入有效数字`
+    if (!isFinite(odNum)) return `${row}：OD「${odTrim}」格式无效，请输入有效数字`
+
+    // 负数检查
+    if (concNum < 0) return `${row}：浓度不能为负数（当前为 ${concNum}）`
+    if (odNum < 0) return `${row}：OD 不能为负数（当前为 ${odNum}）`
+  }
+  return null
+}

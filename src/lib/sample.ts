@@ -96,24 +96,31 @@ export function computeUnkResult(
 }
 
 /**
- * 计算 96 孔板全部结果矩阵（每孔 concentration × dilution）。
- * 返回 8×12 的 (number | null)[][]，null 表示无法计算。
+ * 计算 96 孔板全部结果矩阵。
+ * 返回 8×12 的 WellResult[][]，统一包含浓度、状态和稀释倍数校验结果，
+ * 页面、热图和导出均消费同一对象，不再各自重新推导。
  */
 export function computePlateResults(
   plate: PlateCell[][],
   fit: FitResult | null,
   blankSub: boolean,
   blank: number,
-): (number | null)[][] {
+  minC: number,
+  maxC: number,
+): WellResult[][] {
   return plate.map((row) =>
     row.map((cell) => {
       const od = parseNumber(cell.od)
-      if (!fit || od === null) return null
+      if (!fit || od === null) {
+        return { status: 'invalid' as SampleStatus, raw: null, conc: null, dilInvalid: false, adjOd: null }
+      }
       const raw = computeRawConcentration(od, fit, blankSub, blank)
-      if (raw === null) return null
+      const status = computeSampleStatus(raw, minC, maxC)
       const df = parseDil(cell.dilution)
-      if (df === null) return null
-      return raw * df
+      const dilInvalid = df === null
+      const conc = status === 'valid' && raw !== null && df !== null ? raw * df : null
+      const adjOd = blankSub ? od - blank : od
+      return { status, raw, conc, dilInvalid, adjOd }
     }),
   )
 }

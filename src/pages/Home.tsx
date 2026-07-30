@@ -20,8 +20,8 @@ import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { fitFourPL, fourPL, curvePoints, fmt, standardsSignature, formula, FIT_REASON_TEXT, EC50_LOCATION_TEXT, type FitResult } from '@/lib/fourPL'
 import { parseNumber, parseDil } from '@/lib/parsing'
-import { deriveStandardPoints, validateStandards, type StdRow } from '@/lib/standards'
-import { computeRawConcentration, computeSampleStatus, computePlateResults, computeChartUnkDots, computeBackCalc, SAMPLE_STATUS_TEXT, type SampleStatus, type UnkRow, type PlateCell } from '@/lib/sample'
+import { deriveStandardPoints, validateStandards, validateStandardRows, type StdRow } from '@/lib/standards'
+import { computeRawConcentration, computeSampleStatus, computePlateResults, computeChartUnkDots, computeBackCalc, SAMPLE_STATUS_TEXT, type SampleStatus, type UnkRow, type PlateCell, type WellResult } from '@/lib/sample'
 
 const EXAMPLE_STDS: StdRow[] = [
   { conc: '2000', od: '2.512' },
@@ -99,6 +99,8 @@ export default function Home() {
   const fitStale = fitState !== null && fitState.sig !== currentSig
 
   const doFit = () => {
+    const rowErr = validateStandardRows(stds)
+    if (rowErr) { setFitState(null); setFitError(rowErr); return }
     const err = validateStandards(stdPoints.pts)
     if (err) { setFitState(null); setFitError(err); return }
     const res = fitFourPL(stdPoints.pts)
@@ -120,10 +122,10 @@ export default function Home() {
   // 局部包装函数：从闭包中捕获当前 fit / blank / minC / maxC
   const rawConc = (od: number) => computeRawConcentration(od, fit, blankSub, stdPoints.blank)
   const sampleStatus = (raw: number | null): SampleStatus => computeSampleStatus(raw, minC, maxC)
-  // 96 孔板结果（每孔 OD × 每孔稀释倍数）
+  // 96 孔板结果（统一 WellResult，包含浓度、状态、稀释倍数校验）
   const plateResults = useMemo(
-    () => computePlateResults(plate, fit, blankSub, stdPoints.blank),
-    [plate, fit, blankSub, stdPoints],
+    () => computePlateResults(plate, fit, blankSub, stdPoints.blank, minC, maxC),
+    [plate, fit, blankSub, stdPoints, minC, maxC],
   )
   const plateOdValues = useMemo(
     () => plate.flat().map((v) => parseNumber(v.od)).filter((v): v is number => v !== null),
@@ -132,19 +134,10 @@ export default function Home() {
   // 热图编码值：有拟合时按浓度（越浓颜色越深），只取有效范围内的孔
   const plateConcValues = useMemo(() => {
     if (!fit) return [] as number[]
-    return plateResults.flat().filter((v, idx): v is number => {
-      if (v === null || !isFinite(v)) return false
-      const r = Math.floor(idx / 12)
-      const c = idx % 12
-      const cell = plate[r]?.[c]
-      if (!cell) return false
-      const od = parseNumber(cell.od)
-      if (od === null) return false
-      const raw = rawConc(od)
-      return raw !== null && raw >= minC && raw <= maxC
-    })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [plateResults, plate, fit, minC, maxC])
+    return plateResults.flat().filter((r): r is WellResult & { conc: number } =>
+      r.status === 'valid' && r.conc !== null && isFinite(r.conc),
+    ).map((r) => r.conc)
+  }, [plateResults, fit])
   const heatValues = fit && plateConcValues.length > 0 ? plateConcValues : plateOdValues
   const plateMin = heatValues.length ? Math.min(...heatValues) : 0
   const plateMax = heatValues.length ? Math.max(...heatValues) : 1
@@ -256,15 +249,13 @@ export default function Home() {
   /** 与结果板口径一致的浓度导出文本：范围内给数值；
    *  无法计算 / 超出标准曲线范围给状态文本，不导出外推浓度 */
   const exportConc = (r: number, c: number): string => {
-    const cell = plate[r][c]
-    const hasOd = parseNumber(cell.od) !== null
-    const v = plateResults[r][c]
-    if (v === null || !Number.isFinite(v)) return hasOd ? 'N/A' : ''
-    const df = parseDil(cell.dilution)
-    if (df === null) return '稀释倍数无效'
-    const status = sampleStatus(v / df)
-    if (status === 'valid') return v.toFixed(3)
-    return status === 'invalid' ? 'N/A' : status === 'below-range' ? '低于范围' : '高于范围'
+    const result = plateResults[r][c]
+    const hasOd = parseNumber(plate[r][c].od) !== null
+    if (!hasOd) return ''
+    if (result.dilInvalid) return '稀释倍数无效'
+    if (result.conc === null || !Number.isFinite(result.conc)) return 'N/A'
+    if (result.status === 'valid') return result.conc.toFixed(3)
+    return result.status === 'below-range' ? '低于范围' : '高于范围'
   }
 
   /** 只复制浓度：粘贴后保持 8×12 孔板矩阵 */
@@ -660,7 +651,7 @@ export default function Home() {
                               const uncomputable = num !== null && fit && raw === null
                               const selected = selectedCell?.r === r && selectedCell?.c === c
                               // 热图颜色按浓度编码（无拟合时退回 OD）；分组 / 倍数模式下空格用深色文字保证可读
-                              const heatValue = fit && plateResults[r][c] !== null ? (plateResults[r][c] as number) : (num ?? 0)
+                              const heatValue = fit && plateResults[r][c].conc !== null ? (plateResults[r][c].conc as number) : (num ?? 0)
                               const baseCls = num === null
                                 ? entryMode === 'od'
                                   ? 'bg-white text-slate-300'
@@ -699,12 +690,8 @@ export default function Home() {
                     const { r, c } = selectedCell
                     const cell = plate[r][c]
                     const pos = `${ROWS[r]}${c + 1}`
-                    const od = parseNumber(cell.od)
-                    const df = parseDil(cell.dilution)
-                    const raw = od !== null && fit ? rawConc(od) : null
-                    const status = od !== null && fit ? sampleStatus(raw) : null
-                    const dilInvalid = od !== null && fit && df === null
-                    const conc = status === 'valid' && raw !== null && df !== null ? raw * df : null
+                    const result = plateResults[r][c]
+                    const hasOd = parseNumber(cell.od) !== null
                     return (
                       <div className="mt-3 rounded-lg border bg-slate-50 p-3 space-y-2">
                         <div className="flex items-center justify-between">
@@ -742,7 +729,7 @@ export default function Home() {
                             />
                           </label>
                           <span className="font-mono text-sm font-semibold text-teal-700">
-                            浓度 = {status === null ? (fit ? '—' : '待拟合') : dilInvalid ? '稀释倍数无效' : conc !== null ? `${fmt(conc)} ${unit}` : SAMPLE_STATUS_TEXT[status]}
+                            浓度 = {!fit ? '待拟合' : !hasOd ? '—' : result.dilInvalid ? '稀释倍数无效' : result.status === 'valid' && result.conc !== null ? `${fmt(result.conc)} ${unit}` : SAMPLE_STATUS_TEXT[result.status]}
                           </span>
                         </div>
                         {/* 上下左右切换孔位 */}
@@ -839,24 +826,27 @@ export default function Home() {
                         </div>
                         {plateResults.map((row, r) => (
                           <div key={r} className="flex gap-0.5 sm:gap-1 mb-0.5 sm:mb-1 items-center">
-                          {row.map((v, c) => {
+                          {row.map((result, c) => {
                             const cell = plate[r]?.[c]
                             const group = cell?.group.trim() ?? ''
                             const hasOd = parseNumber(cell?.od ?? '') !== null
-                            const df = parseDil(cell?.dilution ?? '')
                             let cls = 'bg-white text-slate-300 border-slate-200'
                             let text = '—'
                             let statusText = ''
-                            if (hasOd && fit && df !== null) {
-                              const status = sampleStatus(v === null ? null : v / df)
-                              statusText = SAMPLE_STATUS_TEXT[status]
-                              if (status === 'valid' && v !== null) {
-                                cls = 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                                text = fmt(v, 3)
-                              } else {
-                                // 超出范围 / 无法计算时不展示外推浓度
+                            if (hasOd && fit) {
+                              if (result.dilInvalid) {
                                 cls = 'bg-red-100 text-red-700 border-red-300'
-                                text = status === 'invalid' ? 'N/A' : status === 'below-range' ? '低于范围' : '高于范围'
+                                text = '稀释倍数无效'
+                                statusText = '稀释倍数无效'
+                              } else {
+                                statusText = SAMPLE_STATUS_TEXT[result.status]
+                                if (result.status === 'valid' && result.conc !== null) {
+                                  cls = 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                  text = fmt(result.conc, 3)
+                                } else {
+                                  cls = 'bg-red-100 text-red-700 border-red-300'
+                                  text = result.status === 'invalid' ? 'N/A' : result.status === 'below-range' ? '低于范围' : '高于范围'
+                                }
                               }
                             }
                             const selected = selectedCell?.r === r && selectedCell?.c === c

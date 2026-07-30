@@ -37,6 +37,8 @@ export type EC50Location =
 export interface FitDiagnostics {
   /** EC50 与实验取样范围的关系 */
   ec50Location: EC50Location
+  /** 驻点处近似 Hessian (JᵀJ) 是否接近奇异（参数可辨识性存疑） */
+  jacobianRankDeficient: boolean
 }
 
 export interface FitResult {
@@ -57,9 +59,23 @@ export interface StandardPoint {
   od: number
 }
 
-/** 4PL 正向函数 */
+/**
+ * 4PL 正向函数。
+ * 使用与内部 model() 相同的分支 Logistic，避免 Math.pow 在极端 b/c 下溢出/下溢/NaN。
+ */
 export function fourPL(x: number, p: FourPLParams): number {
-  return p.d + (p.a - p.d) / (1 + Math.pow(x / p.c, p.b))
+  const s = p.b * (Math.log(x) - Math.log(p.c))
+  if (!isFinite(s)) {
+    if (Number.isNaN(s)) return (p.a + p.d) / 2
+    return s > 0 ? p.d : p.a
+  }
+  let w: number
+  if (s >= 0) {
+    w = Math.exp(-s) / (1 + Math.exp(-s))
+  } else {
+    w = 1 / (1 + Math.exp(s))
+  }
+  return p.d + (p.a - p.d) * w
 }
 
 /** 4PL 反函数: 由 OD 求浓度；超出渐近线区间返回 null */
@@ -271,19 +287,17 @@ export function fitFourPL(points: StandardPoint[]): FitResult | null {
           for (let n = 0; n < 4; n++) JtJ[m][n] += g[m] * g[n]
         }
       }
-      // 梯度收敛判据（无量纲）：接近驻点时即便 SSE 仍在缓慢改善也视为收敛，
-      // 避免参数沿平坦山脊漂移导致好拟合被误判为 max-iterations。
-      // 要求正规方程可解（参数可辨识）：平坦数据等 b/c 不可辨识的情形不适用此判据
+      // 梯度收敛判据（无量纲）：梯度足够小即为驻点，不要求 JᵀJ 可解。
+      // 参数是否可辨识由 diagnostics.jacobianRankDeficient 单独报告。
       // 阈值取相对估计与绝对下限的最大值，防止完美拟合（SSE≈0）时判据失效
       const gradInf = Math.max(Math.abs(Jtr[0]), Math.abs(Jtr[1]), Math.abs(Jtr[2]), Math.abs(Jtr[3]))
       const diagMax = Math.max(JtJ[0][0], JtJ[1][1], JtJ[2][2], JtJ[3][3])
       const gradTol = Math.max(1e-12, 1e-6 * Math.sqrt(diagMax * current + 1e-300))
-      if (gradInf <= gradTol && solve4(JtJ, Jtr) !== null) {
+      if (gradInf <= gradTol) {
         reason = 'tolerance'
         break
       }
       let stepped = false
-      let done = false
       // 内层循环最终的退出原因（奇异 / 无改善），用于准确报告 reason
       let innerExit: FitReason = 'no-improvement'
       for (let tries = 0; tries < 60; tries++) {
@@ -304,28 +318,9 @@ export function fitFourPL(points: StandardPoint[]): FitResult | null {
           if (lambda > 1e15) break
           continue
         }
-        // 纯相对改善判据，不依赖 OD 的绝对量级
-        const rel = (current - sNew) / Math.max(current, 1e-300)
         if (sNew < current) {
-          // 步长是否足够小（各参数分量相对自身量级的最大变化）
-          const stepInf = Math.max(...delta.map((d, k) => Math.abs(d) / (1 + Math.abs(q[k]))))
-          const stepSmall = stepInf < 1e-6
-          // 仅当 SSE 改善极微且步长也极小时才判定收敛；若步长不小但改善极微，
-          // 说明可能处于平坦区域或因阻尼过大，提高 lambda 再试
-          if (rel < 1e-10 && stepSmall) {
-            q = qNew
-            current = sNew
-            reason = 'tolerance'
-            done = true
-            break
-          }
-          if (rel < 1e-10) {
-            // 改善极微但步长不小 → 增大阻尼，迫使步长收缩后再判断
-            lambda *= 10
-            if (lambda > 1e15) break
-            continue
-          }
-          // 有效改善（rel >= 1e-10）→ 接受步
+          // 只要 SSE 下降就接受步长；tolerance 仅由外层梯度判据决定，
+          // 不通过增大阻尼人工制造小步长来伪装收敛
           q = qNew
           current = sNew
           lambda = Math.max(lambda / 5, 1e-12)
@@ -335,7 +330,6 @@ export function fitFourPL(points: StandardPoint[]): FitResult | null {
         lambda *= 10
         if (lambda > 1e15) break
       }
-      if (done) break
       if (!stepped) {
         reason = innerExit
         break
@@ -367,30 +361,16 @@ export function fitFourPL(points: StandardPoint[]): FitResult | null {
   let bestReason: FitReason = 'no-improvement'
   const runs = starts.map((s) => lmRun(s))
 
-  // 只在真正收敛且参数有限的结果中选择 SSE 最小的
-  const convergedRuns = runs.filter((r) => {
-    if (r.reason !== 'tolerance') return false
-    if (!isFinite(r.sse)) return false
-    const p = toParams(r.q)
-    return isFinite(p.a) && isFinite(p.b) && isFinite(p.c) && isFinite(p.d)
-  })
-
-  if (convergedRuns.length > 0) {
-    for (const { q, sse: s2, reason } of convergedRuns) {
-      if (s2 < bestSSE) {
-        bestSSE = s2
-        bestQ = q
-        bestReason = reason
-      }
-    }
-  } else {
-    // 没有任何启动收敛 → 返回 SSE 最低的未收敛结果用于错误报告
-    for (const { q, sse: s2, reason } of runs) {
-      if (isFinite(s2) && s2 < bestSSE) {
-        bestSSE = s2
-        bestQ = q
-        bestReason = reason
-      }
+  // 在所有参数有限、SSE 有限的运行中选 SSE 最小的，诚实保留其 reason
+  for (const { q, sse: s2, reason } of runs) {
+    if (!isFinite(s2)) continue
+    const p = toParams(q)
+    if (!isFinite(p.a) || !isFinite(p.b) || !isFinite(p.c) || !isFinite(p.d)) continue
+    if (p.b <= 0 || p.c <= 0) continue
+    if (s2 < bestSSE) {
+      bestSSE = s2
+      bestQ = q
+      bestReason = reason
     }
   }
   if (!bestQ) return null
@@ -420,7 +400,18 @@ export function fitFourPL(points: StandardPoint[]): FitResult | null {
   } else {
     ec50Location = 'extreme'
   }
-  const diagnostics: FitDiagnostics = { ec50Location }
+  // 在最优解处评估近似 Hessian 是否接近奇异（参数可辨识性诊断）
+  const JtJFinal: number[][] = [[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]]
+  for (let i = 0; i < logXs.length; i++) {
+    const [, da, dlogB, dlogC, dd] = modelWithGrad(logXs[i], bestQ)
+    const g = [da, dlogB, dlogC, dd]
+    for (let m = 0; m < 4; m++) {
+      for (let n = 0; n < 4; n++) JtJFinal[m][n] += g[m] * g[n]
+    }
+  }
+  const jacobianRankDeficient = solve4(JtJFinal, [0, 0, 0, 0]) === null
+
+  const diagnostics: FitDiagnostics = { ec50Location, jacobianRankDeficient }
 
   return {
     params,

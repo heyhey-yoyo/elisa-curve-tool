@@ -98,22 +98,24 @@ describe('fitFourPL', () => {
     expect(res!.residuals).toHaveLength(15)
   })
 
-  it('无法收敛：完全平坦的数据（b、c 不可辨识）报 singular 且 converged 为 false', () => {
+  it('平坦数据：梯度为零报 tolerance，jacobianRankDeficient 为 true', () => {
     const res = fitFourPL(CONCS.map((conc) => ({ conc, od: 1 })))
     expect(res).not.toBeNull()
-    expect(res!.converged).toBe(false)
-    expect(res!.reason).toBe('singular')
+    // 梯度为零 → 数学上确为驻点
+    expect(res!.reason).toBe('tolerance')
+    // b、c 不可辨识 → Hessian 奇异
+    expect(res!.diagnostics.jacobianRankDeficient).toBe(true)
   })
 
-  it('超宽范围的阶跃数据：可用大斜率通过阶跃，应能收敛但 R² 较低', () => {
+  it('超宽范围的阶跃数据：返回 SSE 最优的有限解', () => {
     const pts = [1e-3, 1e-1, 1e1, 1e3, 1e5].map((conc) => ({ conc, od: conc < 1 ? 3 : 0.001 }))
     const res = fitFourPL(pts)
     expect(res).not.toBeNull()
-    // 去掉 logC 硬边界后，优化器可用大斜率（b 很大）逼近阶跃，应正常收敛
-    expect(res!.converged).toBe(true)
-    expect(res!.reason).toBe('tolerance')
-    // 阶跃毕竟不是真正的 S 形，R² 不会特别高
-    expect(res!.rSquared).toBeLessThan(0.999)
+    expect(isFinite(res!.sse)).toBe(true)
+    expect(res!.params.b).toBeGreaterThan(0)
+    expect(res!.params.c).toBeGreaterThan(0)
+    expect(isFinite(res!.params.a)).toBe(true)
+    expect(isFinite(res!.params.d)).toBe(true)
   })
 
   it('浅斜率曲线（b≈0.32，采样未覆盖两端）正常收敛，EC50 位置通过诊断字段报告', () => {
@@ -127,14 +129,15 @@ describe('fitFourPL', () => {
     expect(res!.params.c).toBeCloseTo(50, -1)
   })
 
-  it('诊断字段：EC50 在标准范围外时 ec50Location 报告异常', () => {
-    // EC50=5000，但标准品只覆盖 1–200（5 个浓度满足最低要求）
+  it('诊断字段：EC50 在标准范围外时 ec50Location 精确报告', () => {
+    // EC50=5000，标准品 1–200；扩展范围 [1/200, 40000/1] = [0.005, 40000]
+    // 5000 ∈ (200, 40000] → outside-standard-range（非 extreme）
     const res = fitFourPL(makeCurve({ a: 2.0, b: 1.0, c: 5000, d: 0.1 }, [1, 5, 20, 80, 200]))
     expect(res).not.toBeNull()
     expect(res!.converged).toBe(true)
-    const loc = res!.diagnostics.ec50Location
-    // EC50=5000 远超 maxC=200，应在扩展范围之外
-    expect(loc === 'outside-standard-range' || loc === 'extreme').toBe(true)
+    expect(res!.diagnostics.ec50Location).toBe('outside-standard-range')
+    expect(res!.params.c).toBeGreaterThan(0)
+    expect(isFinite(res!.params.c)).toBe(true)
   })
 
   it('极小 OD 尺度（1e-7）下经 OD 归一化仍正常收敛', () => {

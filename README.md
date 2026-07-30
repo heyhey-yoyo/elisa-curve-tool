@@ -44,7 +44,7 @@ npm run test    # Vitest 单元测试
 
 ## 目录结构
 
-```
+```text
 src/
 ├── main.tsx            # 入口
 ├── App.tsx             # 路由表（/ → Home）

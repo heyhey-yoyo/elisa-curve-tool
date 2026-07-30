@@ -61,7 +61,7 @@ export default function Home() {
   const [unkRows, setUnkRows] = useState<UnkRow[]>([emptyUnk()])
   const [plate, setPlate] = useState<PlateCell[][]>(emptyPlate)
   const [unit, setUnit] = useState('pg/mL')
-  const [blankSub, setBlankSub] = useState(true)
+  const [blankSub, setBlankSub] = useState(false)
   /** 拟合结果及其对应的标准品输入签名（签名不一致即失效） */
   const [fitState, setFitState] = useState<{ result: FitResult; sig: string } | null>(null)
   const [fitError, setFitError] = useState<string | null>(null)

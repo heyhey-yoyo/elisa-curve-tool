@@ -99,7 +99,7 @@ export default function Home() {
   const fitStale = fitState !== null && fitState.sig !== currentSig
 
   const doFit = () => {
-    const rowErr = validateStandardRows(stds)
+    const rowErr = validateStandardRows(stds, blankSub)
     if (rowErr) { setFitState(null); setFitError(rowErr); return }
     const err = validateStandards(stdPoints.pts)
     if (err) { setFitState(null); setFitError(err); return }
@@ -250,10 +250,10 @@ export default function Home() {
    *  无法计算 / 超出标准曲线范围给状态文本，不导出外推浓度 */
   const exportConc = (r: number, c: number): string => {
     const result = plateResults[r][c]
-    const hasOd = parseNumber(plate[r][c].od) !== null
-    if (!hasOd) return ''
-    if (result.dilInvalid) return '稀释倍数无效'
+    const odText = plate[r][c].od.trim()
+    if (odText === '') return ''
     if (result.odInvalid) return 'OD 无效'
+    if (result.dilInvalid) return '稀释倍数无效'
     if (result.status === 'valid' && result.conc !== null) return result.conc.toFixed(3)
     if (result.status === 'below-range') return '低于范围'
     if (result.status === 'above-range') return '高于范围'
@@ -284,10 +284,10 @@ export default function Home() {
       for (let r = 0; r < ROWS.length; r++) {
         const cell = plate[r][c]
         const group = cell.group.trim()
-        const hasOd = parseNumber(cell.od) !== null
+        const hasOdInput = cell.od.trim() !== ''
 
         // 完全空白的孔不复制
-        if (!group && !hasOd) continue
+        if (!group && !hasOdInput) continue
 
         lines.push(`${group}\t${exportConc(r, c)}`)
       }
@@ -574,7 +574,7 @@ export default function Home() {
                                 <Badge variant="destructive">OD 无效</Badge>
                               ) : dilInvalid ? (
                                 <Badge variant="destructive">稀释倍数无效</Badge>
-                              ) : status && (
+                              ) : od === null ? null : status && (
                                 <Badge
                                   variant={status === 'invalid' ? 'destructive' : status === 'valid' ? 'secondary' : 'secondary'}
                                   className={status === 'valid' ? '' : status === 'invalid' ? '' : 'bg-amber-100 text-amber-700'}
@@ -656,24 +656,28 @@ export default function Home() {
                         {plate.map((row, r) => (
                           <div key={r} className="flex gap-0.5 sm:gap-1 mb-0.5 sm:mb-1 items-center">
                             {row.map((cell, c) => {
-                              const num = parseNumber(cell.od)
+                              const odText = cell.od.trim()
+                              const num = parseNumber(odText)
                               const result = plateResults[r][c]
                               const raw = num !== null && fit ? rawConc(num) : null
                               const outOfRange = raw !== null && (raw < minC || raw > maxC)
                               const uncomputable = num !== null && fit && raw === null
                               const hasError = result.dilInvalid || result.odInvalid
+                              const hasOdInput = odText !== ''
                               const selected = selectedCell?.r === r && selectedCell?.c === c
                               // 热图颜色按浓度编码（无拟合时退回 OD）；非法稀释倍数/OD 不进热图色阶
                               const heatValue = fit && result.conc !== null && !hasError ? (result.conc as number) : (num ?? 0)
-                              const baseCls = num === null
-                                ? entryMode === 'od'
-                                  ? 'bg-white text-slate-300'
-                                  : 'bg-white text-slate-700'
-                                : uncomputable || outOfRange || hasError
-                                  ? 'bg-red-100 text-red-700 border-red-300'
-                                  : heatMap
-                                    ? cellStyle(heatValue, plateMin, plateMax)
-                                    : 'bg-teal-50 text-teal-900'
+                              const baseCls = hasError
+                                ? 'bg-red-100 text-red-700 border-red-300'
+                                : !hasOdInput
+                                  ? entryMode === 'od'
+                                    ? 'bg-white text-slate-300'
+                                    : 'bg-white text-slate-700'
+                                  : uncomputable || outOfRange
+                                    ? 'bg-red-100 text-red-700 border-red-300'
+                                    : heatMap
+                                      ? cellStyle(heatValue, plateMin, plateMax)
+                                      : 'bg-teal-50 text-teal-900'
                               return (
                                 <input
                                   key={c}
@@ -704,7 +708,7 @@ export default function Home() {
                     const cell = plate[r][c]
                     const pos = `${ROWS[r]}${c + 1}`
                     const result = plateResults[r][c]
-                    const hasOd = parseNumber(cell.od) !== null
+                    const hasOdInput = cell.od.trim() !== ''
                     return (
                       <div className="mt-3 rounded-lg border bg-slate-50 p-3 space-y-2">
                         <div className="flex items-center justify-between">
@@ -742,7 +746,7 @@ export default function Home() {
                             />
                           </label>
                           <span className="font-mono text-sm font-semibold text-teal-700">
-                            浓度 = {!fit ? '待拟合' : !hasOd ? '—' : result.odInvalid ? 'OD 无效' : result.dilInvalid ? '稀释倍数无效' : result.status === 'valid' && result.conc !== null ? `${fmt(result.conc)} ${unit}` : SAMPLE_STATUS_TEXT[result.status]}
+                            浓度 = {!fit ? '待拟合' : result.odInvalid ? 'OD 无效' : !hasOdInput ? '—' : result.dilInvalid ? '稀释倍数无效' : result.status === 'valid' && result.conc !== null ? `${fmt(result.conc)} ${unit}` : SAMPLE_STATUS_TEXT[result.status]}
                           </span>
                         </div>
                         {/* 上下左右切换孔位 */}
@@ -842,11 +846,11 @@ export default function Home() {
                           {row.map((result, c) => {
                             const cell = plate[r]?.[c]
                             const group = cell?.group.trim() ?? ''
-                            const hasOd = parseNumber(cell?.od ?? '') !== null
+                            const hasOdInput = (cell?.od ?? '').trim() !== ''
                             let cls = 'bg-white text-slate-300 border-slate-200'
                             let text = '—'
                             let statusText = ''
-                            if (hasOd && fit) {
+                            if (hasOdInput && fit) {
                               if (result.odInvalid) {
                                 cls = 'bg-red-100 text-red-700 border-red-300'
                                 text = 'OD 无效'

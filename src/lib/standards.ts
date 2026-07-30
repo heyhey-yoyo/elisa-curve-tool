@@ -41,7 +41,9 @@ export function validateStandards(pts: StandardPoint[]): string | null {
 }
 
 /** 逐行校验标准品输入：只静默跳过双空行，其他问题返回具体错误 */
-export function validateStandardRows(stds: StdRow[]): string | null {
+export function validateStandardRows(stds: StdRow[], blankSub: boolean): string | null {
+  let blankCount = 0
+
   for (let i = 0; i < stds.length; i++) {
     const { conc, od } = stds[i]
     const row = `第 ${i + 1} 行`
@@ -66,6 +68,16 @@ export function validateStandardRows(stds: StdRow[]): string | null {
     // 负数检查
     if (concNum < 0) return `${row}：浓度不能为负数（当前为 ${concNum}）`
     if (odNum < 0) return `${row}：OD 不能为负数（当前为 ${odNum}）`
+
+    // 统计空白行（浓度为 0）
+    if (concNum === 0) blankCount++
   }
+
+  // 多条 blank
+  if (blankCount > 1) return '存在多条浓度为 0 的行，blank 只能填写一行'
+
+  // 开启空白校正但未填 blank
+  if (blankSub && blankCount === 0) return '已启用空白孔校正，但未找到浓度为 0 的标准品行'
+
   return null
 }

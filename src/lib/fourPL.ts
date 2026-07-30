@@ -28,6 +28,17 @@ export type FitReason =
   | 'singular' // 矩阵奇异，无法求解
   | 'no-improvement' // 多次迭代仍无改善
 
+/** EC50 相对标准品浓度范围的位置 */
+export type EC50Location =
+  | 'inside-standard-range' // EC50 落在 [minC, maxC] 内
+  | 'outside-standard-range' // EC50 在扩展范围 [minC²/maxC, maxC²/minC] 内，但超出标准范围
+  | 'extreme' // EC50 超出扩展范围，曲线在实测区间内接近直线
+
+export interface FitDiagnostics {
+  /** EC50 与实验取样范围的关系 */
+  ec50Location: EC50Location
+}
+
 export interface FitResult {
   params: FourPLParams
   sse: number
@@ -35,9 +46,10 @@ export interface FitResult {
   rSquared: number
   residuals: number[]
   fitted: number[]
-  iterations: number
   converged: boolean
   reason: FitReason
+  /** 拟合质量诊断（拟合后评价，不参与优化过程） */
+  diagnostics: FitDiagnostics
 }
 
 export interface StandardPoint {
@@ -96,32 +108,97 @@ function initialGuess(points: StandardPoint[]): FourPLParams {
   return { a, b: 1, c: c > 0 ? c : 1, d }
 }
 
-/** 模型（q = [a, logB, logC, d]），与 fourPL 完全一致：y = d + (a-d)/(1+(x/c)^b) */
+/**
+ * 数值稳定的 4PL 模型计算。
+ * q = [a, logB, logC, d]，其中 b = exp(logB) > 0, c = exp(logC) > 0。
+ *
+ * 令 s = b × (logX − logC)，则 y = d + (a − d) / (1 + exp(s))。
+ * 使用分支避免 exp(s) 上溢 / 下溢导致的 NaN：
+ *   s ≥ 0 → w = exp(−s) / (1 + exp(−s))
+ *   s < 0 → w = 1 / (1 + exp(s))
+ *   s = NaN（b = Infinity 且 logX = logC 时出现）→ 返回 (a+d)/2
+ */
 function model(logX: number, q: [number, number, number, number]): number {
   const [a, logB, logC, d] = q
-  const t = Math.exp(Math.exp(logB) * (logX - logC))
-  return d + (a - d) / (1 + t)
+  const b = Math.exp(logB)
+  const s = b * (logX - logC)
+
+  if (!isFinite(s)) {
+    // s = NaN（0 × Infinity：b 无限且恰好在 EC50 处）→ 曲线中点
+    // s = ±Infinity（b 极大且不在 EC50 处）→ 上述分支自然处理
+    if (Number.isNaN(s)) return (a + d) / 2
+    return s > 0 ? d : a
+  }
+
+  let w: number
+  if (s >= 0) {
+    w = Math.exp(-s) / (1 + Math.exp(-s))
+  } else {
+    w = 1 / (1 + Math.exp(s))
+  }
+  return d + (a - d) * w
+}
+
+/**
+ * 同时计算模型值与解析梯度（对 q 各分量的偏导数）。
+ * 返回 [y, ∂y/∂a, ∂y/∂(logB), ∂y/∂(logC), ∂y/∂d]。
+ *
+ * 梯度公式（令 w = 1/(1+exp(s)), s = b×(logX−logC)）：
+ *   ∂y/∂a = w
+ *   ∂y/∂d = 1 − w
+ *   ∂y/∂(logB) = −(a−d) × w(1−w) × s
+ *   ∂y/∂(logC) = (a−d) × w(1−w) × b
+ *
+ * w(1−w) 通过 exp(−|s|)/(1+exp(−|s|))² 稳定计算，避免 0×∞ = NaN。
+ */
+function modelWithGrad(
+  logX: number,
+  q: [number, number, number, number],
+): [number, number, number, number, number] {
+  const [a, logB, logC, d] = q
+  const b = Math.exp(logB)
+  const s = b * (logX - logC)
+
+  if (!isFinite(s)) {
+    if (Number.isNaN(s)) {
+      // b = Infinity 且恰在 EC50 处：y = (a+d)/2，梯度 w.r.t. logB/logC 无定义，设 0
+      return [(a + d) / 2, 0.5, 0, 0, 0.5]
+    }
+    // s = ±Infinity：处于渐近线，所有导数为 0
+    if (s > 0) return [d, 0, 0, 0, 1]
+    return [a, 1, 0, 0, 0]
+  }
+
+  // |s| 极大时 w(1−w) 在双精度下已退化为 0，直接设导数为零，避免无效计算
+  if (Math.abs(s) > 700) {
+    if (s > 0) return [d, 0, 0, 0, 1]
+    return [a, 1, 0, 0, 0]
+  }
+
+  let w: number, w1mw: number // w(1−w)
+  if (s >= 0) {
+    const es = Math.exp(-s) // es ∈ (0, 1]
+    const denom = 1 + es
+    w = es / denom
+    w1mw = es / (denom * denom)
+  } else {
+    const es = Math.exp(s) // es ∈ (0, 1)
+    const denom = 1 + es
+    w = 1 / denom
+    w1mw = es / (denom * denom)
+  }
+
+  const y = d + (a - d) * w
+  const da = w
+  const dd = 1 - w
+  const dlogB = -(a - d) * w1mw * s
+  const dlogC = (a - d) * w1mw * b
+
+  return [y, da, dlogB, dlogC, dd]
 }
 
 function toParams(q: [number, number, number, number]): FourPLParams {
   return { a: q[0], b: Math.exp(q[1]), c: Math.exp(q[2]), d: q[3] }
-}
-
-/** 有限差分雅可比 */
-function jacobian(logXs: number[], q: [number, number, number, number]): number[][] {
-  const J: number[][] = []
-  const eps = 1e-6
-  for (const lx of logXs) {
-    const row: number[] = []
-    for (let k = 0; k < 4; k++) {
-      const step = Math.abs(q[k]) * eps + 1e-8
-      const q2 = [...q] as [number, number, number, number]
-      q2[k] += step
-      row.push((model(lx, q2) - model(lx, q)) / step)
-    }
-    J.push(row)
-  }
-  return J
 }
 
 /** 高斯消元解 4x4 线性方程组 */
@@ -162,10 +239,6 @@ export function fitFourPL(points: StandardPoint[]): FitResult | null {
   const ys = scaled.map((p) => p.od)
   const lo = Math.min(...logXs)
   const hi = Math.max(...logXs)
-  // logC 的允许范围：数据对数浓度范围向两端各扩一个数据跨度，
-  // 防止采样未覆盖曲线两端时 EC50 漂移到无意义的量级
-  const logCLo = lo - (hi - lo)
-  const logCHi = hi + (hi - lo)
 
   const sse = (qq: [number, number, number, number]) => {
     let s = 0
@@ -187,22 +260,25 @@ export function fitFourPL(points: StandardPoint[]): FitResult | null {
     let iter = 0
     const maxIter = 500
     for (iter = 0; iter < maxIter; iter++) {
-      const J = jacobian(logXs, q)
       const JtJ: number[][] = Array.from({ length: 4 }, () => [0, 0, 0, 0])
       const Jtr: number[] = [0, 0, 0, 0]
       for (let i = 0; i < logXs.length; i++) {
-        const r = ys[i] - model(logXs[i], q)
+        const [yHat, da, dlogB, dlogC, dd] = modelWithGrad(logXs[i], q)
+        const r = ys[i] - yHat
+        const g = [da, dlogB, dlogC, dd]
         for (let m = 0; m < 4; m++) {
-          Jtr[m] += J[i][m] * r
-          for (let n = 0; n < 4; n++) JtJ[m][n] += J[i][m] * J[i][n]
+          Jtr[m] += g[m] * r
+          for (let n = 0; n < 4; n++) JtJ[m][n] += g[m] * g[n]
         }
       }
       // 梯度收敛判据（无量纲）：接近驻点时即便 SSE 仍在缓慢改善也视为收敛，
       // 避免参数沿平坦山脊漂移导致好拟合被误判为 max-iterations。
       // 要求正规方程可解（参数可辨识）：平坦数据等 b/c 不可辨识的情形不适用此判据
+      // 阈值取相对估计与绝对下限的最大值，防止完美拟合（SSE≈0）时判据失效
       const gradInf = Math.max(Math.abs(Jtr[0]), Math.abs(Jtr[1]), Math.abs(Jtr[2]), Math.abs(Jtr[3]))
       const diagMax = Math.max(JtJ[0][0], JtJ[1][1], JtJ[2][2], JtJ[3][3])
-      if (gradInf <= 1e-6 * Math.sqrt(diagMax * current + 1e-300) && solve4(JtJ, Jtr) !== null) {
+      const gradTol = Math.max(1e-12, 1e-6 * Math.sqrt(diagMax * current + 1e-300))
+      if (gradInf <= gradTol && solve4(JtJ, Jtr) !== null) {
         reason = 'tolerance'
         break
       }
@@ -222,8 +298,6 @@ export function fitFourPL(points: StandardPoint[]): FitResult | null {
           continue
         }
         const qNew = q.map((v, k) => v + delta[k]) as [number, number, number, number]
-        // 限制 logC 不漂出允许范围
-        qNew[2] = Math.min(Math.max(qNew[2], logCLo), logCHi)
         const sNew = sse(qNew)
         if (!isFinite(sNew)) {
           lambda *= 10
@@ -232,15 +306,26 @@ export function fitFourPL(points: StandardPoint[]): FitResult | null {
         }
         // 纯相对改善判据，不依赖 OD 的绝对量级
         const rel = (current - sNew) / Math.max(current, 1e-300)
-        if (sNew <= current && rel < 1e-10) {
-          // 改善已低于误差阈值，达到收敛容差
-          q = qNew
-          current = sNew
-          reason = 'tolerance'
-          done = true
-          break
-        }
         if (sNew < current) {
+          // 步长是否足够小（各参数分量相对自身量级的最大变化）
+          const stepInf = Math.max(...delta.map((d, k) => Math.abs(d) / (1 + Math.abs(q[k]))))
+          const stepSmall = stepInf < 1e-6
+          // 仅当 SSE 改善极微且步长也极小时才判定收敛；若步长不小但改善极微，
+          // 说明可能处于平坦区域或因阻尼过大，提高 lambda 再试
+          if (rel < 1e-10 && stepSmall) {
+            q = qNew
+            current = sNew
+            reason = 'tolerance'
+            done = true
+            break
+          }
+          if (rel < 1e-10) {
+            // 改善极微但步长不小 → 增大阻尼，迫使步长收缩后再判断
+            lambda *= 10
+            if (lambda > 1e15) break
+            continue
+          }
+          // 有效改善（rel >= 1e-10）→ 接受步
           q = qNew
           current = sNew
           lambda = Math.max(lambda / 5, 1e-12)
@@ -280,24 +365,32 @@ export function fitFourPL(points: StandardPoint[]): FitResult | null {
   let bestQ: [number, number, number, number] | null = null
   let bestSSE = Infinity
   let bestReason: FitReason = 'no-improvement'
-  let totalIter = 0
   const runs = starts.map((s) => lmRun(s))
-  for (const r of runs) totalIter += r.iter
-  for (const { q, sse: s2, reason } of runs) {
-    if (s2 < bestSSE) {
-      bestSSE = s2
-      bestQ = q
-      bestReason = reason
+
+  // 只在真正收敛且参数有限的结果中选择 SSE 最小的
+  const convergedRuns = runs.filter((r) => {
+    if (r.reason !== 'tolerance') return false
+    if (!isFinite(r.sse)) return false
+    const p = toParams(r.q)
+    return isFinite(p.a) && isFinite(p.b) && isFinite(p.c) && isFinite(p.d)
+  })
+
+  if (convergedRuns.length > 0) {
+    for (const { q, sse: s2, reason } of convergedRuns) {
+      if (s2 < bestSSE) {
+        bestSSE = s2
+        bestQ = q
+        bestReason = reason
+      }
     }
-  }
-  // 在与最优 SSE 相当（0.1% 以内）的启动中，优先取以 tolerance 正常收敛者，
-  // 避免最优启动恰好以 max-iterations 退出导致好拟合被整体误判为未收敛
-  for (const { q, sse: s2, reason } of runs) {
-    if (reason !== 'tolerance' || s2 > bestSSE * 1.001) continue
-    if (bestReason !== 'tolerance' || s2 < bestSSE) {
-      bestSSE = s2
-      bestQ = q
-      bestReason = reason
+  } else {
+    // 没有任何启动收敛 → 返回 SSE 最低的未收敛结果用于错误报告
+    for (const { q, sse: s2, reason } of runs) {
+      if (isFinite(s2) && s2 < bestSSE) {
+        bestSSE = s2
+        bestQ = q
+        bestReason = reason
+      }
     }
   }
   if (!bestQ) return null
@@ -313,6 +406,22 @@ export function fitFourPL(points: StandardPoint[]): FitResult | null {
   // 响应无变异（SST = 0）时 R² 在数学上无定义，返回 NaN 而非误导性的 1
   const rSquared = ssTot > 0 ? 1 - sseFinal / ssTot : NaN
 
+  // 拟合后诊断：EC50 相对标准品浓度的位置（仅评价，不参与优化）
+  const minConc = Math.min(...valid.map((p) => p.conc))
+  const maxConc = Math.max(...valid.map((p) => p.conc))
+  const extendedLo = (minConc * minConc) / maxConc // = minC² / maxC
+  const extendedHi = (maxConc * maxConc) / minConc // = maxC² / minC
+  const ec50 = params.c
+  let ec50Location: EC50Location
+  if (ec50 >= minConc && ec50 <= maxConc) {
+    ec50Location = 'inside-standard-range'
+  } else if (ec50 >= extendedLo && ec50 <= extendedHi) {
+    ec50Location = 'outside-standard-range'
+  } else {
+    ec50Location = 'extreme'
+  }
+  const diagnostics: FitDiagnostics = { ec50Location }
+
   return {
     params,
     sse: sseFinal,
@@ -320,9 +429,9 @@ export function fitFourPL(points: StandardPoint[]): FitResult | null {
     rSquared,
     residuals,
     fitted,
-    iterations: totalIter,
     converged: bestReason === 'tolerance',
     reason: bestReason,
+    diagnostics,
   }
 }
 
@@ -346,4 +455,24 @@ export function fmt(v: number, sig = 4): string {
   const av = Math.abs(v)
   if (av >= 1e5 || av < 1e-3) return v.toExponential(3)
   return Number(v.toPrecision(sig)).toString()
+}
+
+/** 根据四参数生成可读公式字符串 */
+export function formula(p: FourPLParams): string {
+  return `y = ${fmt(p.d)} + (${fmt(p.a)} − ${fmt(p.d)}) / (1 + (x / ${fmt(p.c)})^${fmt(p.b, 3)})`
+}
+
+/** 拟合未收敛原因的中文说明 */
+export const FIT_REASON_TEXT: Record<FitReason, string> = {
+  tolerance: '达到误差阈值',
+  'max-iterations': '达到最大迭代次数',
+  singular: '矩阵奇异，无法求解',
+  'no-improvement': '多次迭代仍无改善',
+}
+
+/** EC50 位置诊断的中文标签 */
+export const EC50_LOCATION_TEXT: Record<EC50Location, string> = {
+  'inside-standard-range': '',
+  'outside-standard-range': 'EC50 在标曲范围外',
+  'extreme': 'EC50 严重偏离',
 }

@@ -44,11 +44,16 @@ src/
 ├── main.tsx          # 入口：createRoot + StrictMode + BrowserRouter
 ├── App.tsx           # 路由表（目前只有 / → Home）
 ├── pages/
-│   └── Home.tsx      # 全部业务页面：标准品录入、拟合触发、图表、回算表、
-│                     # 96 孔板 / 映射两种浓度计算模式、剪贴板导出
+│   └── Home.tsx      # 页面组件：状态管理 + UI 渲染，业务逻辑委托给 lib/ 模块
 ├── lib/
 │   ├── fourPL.ts     # 核心算法：4PL 正/反函数、LM 拟合（fitFourPL）、
-│   │                 # 曲线点生成（curvePoints）、数字格式化（fmt）
+│   │                 # 曲线点生成（curvePoints）、数字格式化（fmt）、
+│   │                 # 公式生成（formula）、EC50 位置诊断（FitDiagnostics）
+│   ├── fourPL.test.ts# 算法单元测试（Vitest）
+│   ├── parsing.ts    # 严格数字解析：parseNumber / parseDil
+│   ├── standards.ts  # 标准品数据处理：deriveStandardPoints / validateStandards
+│   ├── sample.ts     # 样本浓度计算：computeRawConcentration / computeSampleStatus /
+│   │                 # computePlateResults / computeChartUnkDots / computeBackCalc
 │   └── utils.ts      # cn() —— clsx + tailwind-merge（shadcn 约定）
 ├── hooks/
 │   └── use-mobile.ts # shadcn 附带的移动端断点 hook
@@ -80,12 +85,15 @@ src/
 ## 安全与其他注意事项
 
 - 应用不发送网络请求、不存储用户数据、不使用 Cookie / localStorage，无认证逻辑，无环境变量 / 密钥；浏览器剪贴板写入带有 `execCommand` 降级方案（见 `copyText`）。
-- 算法正确性是本项目的核心价值：修改 `src/lib/fourPL.ts` 前请理解 LM 迭代、有限差分雅可比与多起点策略，并用页面内置的示例数据（`EXAMPLE_STDS`，R² 应 ≥ 0.99）回归验证。
+- 算法正确性是本项目的核心价值：修改 `src/lib/fourPL.ts` 前请理解 LM 迭代、解析雅可比（`modelWithGrad`，替换了有限差分）、多起点策略与拟合后 EC50 诊断，并用页面内置的示例数据（`EXAMPLE_STDS`，R² 应 ≥ 0.99）回归验证。Logistic 计算（`model` / `modelWithGrad`）使用分支形式避免 `exp(s)` 溢出 / 下溢产生 NaN。
 - `fourPLInverse` 对超出渐近线区间的 OD 返回 `null`，页面据此显示「无法计算 / N/A」——新增逻辑请保持这一约定。
 - `fitFourPL` 要求至少 5 个**不同**的浓度（复孔不计入）；浓度为 0 的行只用于空白校正，不参与拟合。
 - `FitResult.converged` / `reason` 是真实的收敛状态（tolerance / max-iterations / singular / no-improvement）：未收敛的结果页面不得作为有效拟合展示，也不用于样本浓度计算。
+- `FitResult.diagnostics.ec50Location` 为拟合后诊断（inside-standard-range / outside-standard-range / extreme），不参与优化过程。EC50 优化中不再被硬边界裁剪，可自由移动以寻找真实驻点。
+- `FitResult` 不含 `iterations` 字段（多起点迭代总和无参考价值）。
 - 标准品任何变化（浓度 / OD / 增删行 / 空白校正）都会改变 `standardsSignature`，使旧拟合立即失效（`Home.tsx` 中派生的 `fit` 置空并提示重新拟合）——修改标准品相关逻辑时请保持这一机制。
 - 页面首次打开为标准品空表，示例数据需点击「载入示例」才加载。
+- 数字解析使用 `parseNumber()` 严格校验：空字符串返回 `null`；非法 / 不完整输入（如 `100abc`）返回 `null`（不会像 `parseFloat` 那样部分解析）。稀释倍数使用 `parseDil()`：空字符串默认 1，非法非空返回 `null`（页面显示「稀释倍数无效」）。
 - `src/components/ui/` 为 shadcn 生成代码，不要手工编辑样式逻辑；需要新组件时用 shadcn CLI 添加。
 
 ---

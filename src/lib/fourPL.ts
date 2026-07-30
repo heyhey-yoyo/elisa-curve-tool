@@ -87,14 +87,6 @@ export function fourPLInverse(y: number, p: FourPLParams): number | null {
   return isFinite(x) ? x : null
 }
 
-/**
- * 标准品输入签名：浓度 / OD / 空白值任一变化都会改变签名。
- * 用于判断旧拟合结果是否已失效（签名不一致即失效，需重新拟合）。
- */
-export function standardsSignature(points: StandardPoint[], blank: number): string {
-  return JSON.stringify({ blank, pts: points.map((p) => [p.conc, p.od]) })
-}
-
 /** 自动初始值估计（b 恒为正，曲线方向由 a、d 的大小关系决定） */
 function initialGuess(points: StandardPoint[]): FourPLParams {
   const sorted = [...points].sort((s, t) => s.conc - t.conc)

@@ -18,7 +18,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import { fitFourPL, fourPL, curvePoints, fmt, standardsSignature, formula, FIT_REASON_TEXT, EC50_LOCATION_TEXT, type FitResult } from '@/lib/fourPL'
+import { fitFourPL, fourPL, curvePoints, fmt, formula, FIT_REASON_TEXT, EC50_LOCATION_TEXT, type FitResult } from '@/lib/fourPL'
 import { parseNumber, parseDil } from '@/lib/parsing'
 import { deriveStandardPoints, validateStandards, validateStandardRows, type StdRow } from '@/lib/standards'
 import { computeRawConcentration, computeSampleStatus, computePlateResults, computeChartUnkDots, computeBackCalc, SAMPLE_STATUS_TEXT, type SampleStatus, type UnkRow, type PlateCell, type WellResult } from '@/lib/sample'
@@ -91,8 +91,8 @@ export default function Home() {
   const stdPoints = useMemo(() => deriveStandardPoints(stds, blankSub), [stds, blankSub])
   const minC = useMemo(() => Math.min(...stdPoints.pts.map((p) => p.conc)), [stdPoints])
   const maxC = useMemo(() => Math.max(...stdPoints.pts.map((p) => p.conc)), [stdPoints])
-  /** 当前标准品输入签名：修改浓度 / OD、增删行、切换空白校正等都会使其改变 */
-  const currentSig = useMemo(() => standardsSignature(stdPoints.pts, stdPoints.blank), [stdPoints])
+  /** 当前标准品输入签名：基于原始输入（stds + blankSub），任何输入变化立即失效 */
+  const currentSig = useMemo(() => JSON.stringify({ stds, blankSub }), [stds, blankSub])
   /** 签名不一致时旧拟合立即失效，不再展示旧曲线、参数与样本换算结果 */
   const fit = fitState && fitState.sig === currentSig ? fitState.result : null
   /** 存在旧拟合但输入已变化 → 提示重新拟合 */

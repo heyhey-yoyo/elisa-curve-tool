@@ -3,10 +3,10 @@ import {
   fourPL,
   fourPLInverse,
   fitFourPL,
-  standardsSignature,
   type FourPLParams,
   type StandardPoint,
 } from './fourPL'
+import type { StdRow } from './standards'
 
 /** 可复现的伪随机数（[-0.5, 0.5)） */
 const makeRand = () => {
@@ -148,22 +148,32 @@ describe('fitFourPL', () => {
   })
 })
 
-describe('standardsSignature（标准品修改后拟合失效）', () => {
-  const pts: StandardPoint[] = [
-    { conc: 1, od: 2 },
-    { conc: 10, od: 1 },
+describe('拟合签名（基于原始输入，任何变化立即失效旧拟合）', () => {
+  const sig = (stds: StdRow[], blankSub: boolean) => JSON.stringify({ stds, blankSub })
+
+  const base: StdRow[] = [
+    { conc: '1', od: '2' },
+    { conc: '10', od: '1' },
   ]
 
   it('相同输入签名一致', () => {
-    expect(standardsSignature(pts, 0.05)).toBe(standardsSignature(pts, 0.05))
+    expect(sig(base, true)).toBe(sig(base, true))
   })
 
-  it('修改浓度 / OD / 空白值、增删数据点后签名均改变', () => {
-    const base = standardsSignature(pts, 0.05)
-    expect(standardsSignature([{ conc: 2, od: 2 }, { conc: 10, od: 1 }], 0.05)).not.toBe(base)
-    expect(standardsSignature([{ conc: 1, od: 2.1 }, { conc: 10, od: 1 }], 0.05)).not.toBe(base)
-    expect(standardsSignature(pts, 0.06)).not.toBe(base)
-    expect(standardsSignature([...pts, { conc: 100, od: 0.5 }], 0.05)).not.toBe(base)
-    expect(standardsSignature(pts.slice(1), 0.05)).not.toBe(base)
+  it('修改浓度 / OD / blankSub、增删行后签名均改变', () => {
+    const s = sig(base, true)
+    expect(sig([{ conc: '2', od: '2' }, { conc: '10', od: '1' }], true)).not.toBe(s)
+    expect(sig([{ conc: '1', od: '2.1' }, { conc: '10', od: '1' }], true)).not.toBe(s)
+    expect(sig(base, false)).not.toBe(s)
+    expect(sig([...base, { conc: '100', od: '0.5' }], true)).not.toBe(s)
+    expect(sig(base.slice(1), true)).not.toBe(s)
+  })
+
+  it('非法输入行也会改变签名（不会被 deriveStandardPoints 静默过滤后保持不变）', () => {
+    const s = sig(base, true)
+    // 新增一条仅填 OD 的行 → 应改变签名
+    expect(sig([...base, { conc: '', od: '0.5' }], true)).not.toBe(s)
+    // 新增第二条 blank → 应改变签名
+    expect(sig([...base, { conc: '0', od: '0.1' }], true)).not.toBe(s)
   })
 })

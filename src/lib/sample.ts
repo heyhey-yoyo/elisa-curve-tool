@@ -4,7 +4,7 @@
  * 所有函数接收显式参数，可在页面 useMemo 中直接调用。
  */
 
-import { fourPLInverse, fmt, type FitResult } from './fourPL'
+import { fourPLInverse, type FitResult } from './fourPL'
 import { parseNumber, parseDil } from './parsing'
 
 // ---- 类型 ----
@@ -113,24 +113,9 @@ export function computePlateResults(
   minC: number,
   maxC: number,
 ): WellResult[][] {
+  // 与单行映射口径完全一致，直接复用 computeUnkResult，避免逻辑重复
   return plate.map((row) =>
-    row.map((cell) => {
-      const odStr = cell.od.trim()
-      const od = parseNumber(odStr)
-      const odInvalid = odStr !== '' && od === null
-      // 稀释倍数校验独立于拟合状态与 OD 有效性（纯输入校验）
-      const df = parseDil(cell.dilution)
-      const dilInvalid = cell.dilution.trim() !== '' && df === null
-      // adjOd 提前计算，与 computeUnkResult 口径一致
-      const adjOd = od !== null && blankSub ? od - blank : od
-      if (!fit || od === null) {
-        return { status: 'invalid' as SampleStatus, raw: null, conc: null, dilInvalid, odInvalid, adjOd }
-      }
-      const raw = computeRawConcentration(od, fit, blankSub, blank)
-      const status = computeSampleStatus(raw, minC, maxC)
-      const conc = status === 'valid' && raw !== null && df !== null ? raw * df : null
-      return { status, raw, conc, dilInvalid, odInvalid, adjOd }
-    }),
+    row.map((cell) => computeUnkResult(cell.od, cell.dilution, fit, blankSub, blank, minC, maxC)),
   )
 }
 
@@ -176,6 +161,3 @@ export function computeBackCalc(
     })
     .sort((a, b) => b.conc - a.conc)
 }
-
-// 导出 fmt 以便 Home.tsx 不需要从 fourPL 导入它用于显示
-export { fmt }

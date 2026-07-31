@@ -60,22 +60,36 @@ export interface StandardPoint {
 }
 
 /**
+ * 数值稳定的 Logistic 权重 w = 1/(1+exp(s))。
+ * 分支形式避免 exp(s) 上溢 / 下溢导致的 NaN：
+ *   s ≥ 0 → w = exp(−s) / (1 + exp(−s))
+ *   s < 0 → w = 1 / (1 + exp(s))
+ * 非有限 s：NaN（b 无限且恰在 EC50 处）→ 0.5；+∞ → 0；−∞ → 1
+ */
+function stableW(s: number): number {
+  if (!isFinite(s)) {
+    if (Number.isNaN(s)) return 0.5
+    return s > 0 ? 0 : 1
+  }
+  if (s >= 0) return Math.exp(-s) / (1 + Math.exp(-s))
+  return 1 / (1 + Math.exp(s))
+}
+
+/** 有限 s 下的 [w, w(1−w)]（仅供梯度计算，调用方需先排除非有限 s）。
+ *  w(1−w) 通过 exp(−|s|)/(1+exp(−|s|))² 稳定计算，避免 0×∞ = NaN。 */
+function stablePair(s: number): [number, number] {
+  const es = s >= 0 ? Math.exp(-s) : Math.exp(s) // es ∈ (0, 1]
+  const denom = 1 + es
+  return [s >= 0 ? es / denom : 1 / denom, es / (denom * denom)]
+}
+
+/**
  * 4PL 正向函数。
- * 使用与内部 model() 相同的分支 Logistic，避免 Math.pow 在极端 b/c 下溢出/下溢/NaN。
+ * 使用与内部 model() 相同的稳定 Logistic 核心，避免 Math.pow 在极端 b/c 下溢出/下溢/NaN。
  */
 export function fourPL(x: number, p: FourPLParams): number {
   const s = p.b * (Math.log(x) - Math.log(p.c))
-  if (!isFinite(s)) {
-    if (Number.isNaN(s)) return (p.a + p.d) / 2
-    return s > 0 ? p.d : p.a
-  }
-  let w: number
-  if (s >= 0) {
-    w = Math.exp(-s) / (1 + Math.exp(-s))
-  } else {
-    w = 1 / (1 + Math.exp(s))
-  }
-  return p.d + (p.a - p.d) * w
+  return p.d + (p.a - p.d) * stableW(s)
 }
 
 /** 4PL 反函数: 由 OD 求浓度；超出渐近线区间返回 null */
@@ -117,34 +131,16 @@ function initialGuess(points: StandardPoint[]): FourPLParams {
 }
 
 /**
- * 数值稳定的 4PL 模型计算。
+ * 数值稳定的 4PL 模型计算（对数浓度空间）。
  * q = [a, logB, logC, d]，其中 b = exp(logB) > 0, c = exp(logC) > 0。
  *
- * 令 s = b × (logX − logC)，则 y = d + (a − d) / (1 + exp(s))。
- * 使用分支避免 exp(s) 上溢 / 下溢导致的 NaN：
- *   s ≥ 0 → w = exp(−s) / (1 + exp(−s))
- *   s < 0 → w = 1 / (1 + exp(s))
- *   s = NaN（b = Infinity 且 logX = logC 时出现）→ 返回 (a+d)/2
+ * 令 s = b × (logX − logC)，则 y = d + (a − d) × stableW(s)，
+ * 与 fourPL() 共用同一稳定核心。
  */
 function model(logX: number, q: [number, number, number, number]): number {
   const [a, logB, logC, d] = q
-  const b = Math.exp(logB)
-  const s = b * (logX - logC)
-
-  if (!isFinite(s)) {
-    // s = NaN（0 × Infinity：b 无限且恰好在 EC50 处）→ 曲线中点
-    // s = ±Infinity（b 极大且不在 EC50 处）→ 上述分支自然处理
-    if (Number.isNaN(s)) return (a + d) / 2
-    return s > 0 ? d : a
-  }
-
-  let w: number
-  if (s >= 0) {
-    w = Math.exp(-s) / (1 + Math.exp(-s))
-  } else {
-    w = 1 / (1 + Math.exp(s))
-  }
-  return d + (a - d) * w
+  const s = Math.exp(logB) * (logX - logC)
+  return d + (a - d) * stableW(s)
 }
 
 /**
@@ -156,8 +152,6 @@ function model(logX: number, q: [number, number, number, number]): number {
  *   ∂y/∂d = 1 − w
  *   ∂y/∂(logB) = −(a−d) × w(1−w) × s
  *   ∂y/∂(logC) = (a−d) × w(1−w) × b
- *
- * w(1−w) 通过 exp(−|s|)/(1+exp(−|s|))² 稳定计算，避免 0×∞ = NaN。
  */
 function modelWithGrad(
   logX: number,
@@ -183,18 +177,7 @@ function modelWithGrad(
     return [a, 1, 0, 0, 0]
   }
 
-  let w: number, w1mw: number // w(1−w)
-  if (s >= 0) {
-    const es = Math.exp(-s) // es ∈ (0, 1]
-    const denom = 1 + es
-    w = es / denom
-    w1mw = es / (denom * denom)
-  } else {
-    const es = Math.exp(s) // es ∈ (0, 1)
-    const denom = 1 + es
-    w = 1 / denom
-    w1mw = es / (denom * denom)
-  }
+  const [w, w1mw] = stablePair(s) // w(1−w)
 
   const y = d + (a - d) * w
   const da = w
@@ -336,10 +319,10 @@ export function fitFourPL(points: StandardPoint[]): FitResult | null {
   }
 
   // 多起点：自动初值 + 不同 c 位置 × 两个曲线方向 × 不同斜率（b 恒正）
+  // OD 归一化（除以正数 yScale）不改变最值，直接复用 validODs
   const g = initialGuess(scaled)
-  const ods = scaled.map((p) => p.od)
-  const minOD = Math.min(...ods)
-  const maxOD = Math.max(...ods)
+  const minOD = Math.min(...validODs)
+  const maxOD = Math.max(...validODs)
 
   const starts: [number, number, number, number][] = [
     [g.a, Math.log(g.b), Math.log(g.c), g.d],
@@ -398,7 +381,7 @@ export function fitFourPL(points: StandardPoint[]): FitResult | null {
     ec50Location = 'extreme'
   }
   // 在最优解处评估近似 Hessian 是否接近奇异（参数可辨识性诊断）
-  const JtJFinal: number[][] = [[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]]
+  const JtJFinal: number[][] = Array.from({ length: 4 }, () => [0, 0, 0, 0])
   for (let i = 0; i < logXs.length; i++) {
     const [, da, dlogB, dlogC, dd] = modelWithGrad(logXs[i], bestQ)
     const g = [da, dlogB, dlogC, dd]

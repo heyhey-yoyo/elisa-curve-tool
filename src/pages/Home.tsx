@@ -1,4 +1,3 @@
-// ELISA_REFACTOR_20260731
 import { useMemo, useRef, useState } from 'react'
 import {
   ComposedChart,
@@ -21,7 +20,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { fitFourPL, fourPL, curvePoints, fmt, formula, FIT_REASON_TEXT, EC50_LOCATION_TEXT, type FitResult } from '@/lib/fourPL'
 import { parseNumber } from '@/lib/parsing'
 import { deriveStandardPoints, validateStandards, validateStandardRows, type StdRow } from '@/lib/standards'
-import { computeRawConcentration, computeUnkResult, computePlateResults, computeChartUnkDots, computeBackCalc, SAMPLE_STATUS_TEXT, type UnkRow, type PlateCell, type WellResult } from '@/lib/sample'
+import { computeUnkResult, computePlateResults, computeChartUnkDots, computeBackCalc, SAMPLE_STATUS_TEXT, type UnkRow, type PlateCell, type WellResult } from '@/lib/sample'
 
 const EXAMPLE_STDS: StdRow[] = [
   { conc: '2000', od: '2.512' },
@@ -55,6 +54,181 @@ function cellStyle(v: number | null, min: number, max: number): string {
   if (t > 0.1) return 'bg-teal-200 text-teal-950'
   return 'bg-teal-50 text-teal-900'
 }
+
+/**
+ * 单孔浓度显示文本（映射表、选中面板、结果板共用同一口径）。
+ * 返回 null 表示该孔有 OD 输入但无计算结果（超出范围等），由调用方决定回退显示。
+ */
+function resultText(
+  result: WellResult,
+  hasOdInput: boolean,
+  hasFit: boolean,
+  opts?: { unit?: string; sig?: number },
+): string | null {
+  if (result.odInvalid) return 'OD 无效'
+  if (result.dilInvalid) return '稀释倍数无效'
+  if (!hasOdInput) return '—'
+  if (!hasFit) return '待拟合'
+  if (result.status === 'valid' && result.conc !== null) {
+    const v = fmt(result.conc, opts?.sig)
+    return opts?.unit ? `${v} ${opts.unit}` : v
+  }
+  return null
+}
+
+/** 浓度结果板单元格：样式与显示文本 */
+function boardCellDisplay(
+  result: WellResult,
+  hasOdInput: boolean,
+  hasFit: boolean,
+): { cls: string; text: string; statusText: string } {
+  if (result.odInvalid || result.dilInvalid) {
+    const t = result.odInvalid ? 'OD 无效' : '稀释倍数无效'
+    return { cls: 'bg-red-100 text-red-700 border-red-300', text: t, statusText: t }
+  }
+  if (!hasOdInput) return { cls: 'bg-white text-slate-300 border-slate-200', text: '—', statusText: '' }
+  if (!hasFit) return { cls: 'bg-white text-slate-400', text: '待拟合', statusText: '待拟合' }
+  const statusText = SAMPLE_STATUS_TEXT[result.status]
+  if (result.status === 'valid' && result.conc !== null) {
+    return { cls: 'bg-emerald-50 text-emerald-800 border-emerald-200', text: fmt(result.conc, 3), statusText }
+  }
+  const text = result.status === 'invalid' ? 'N/A' : result.status === 'below-range' ? '低于范围' : '高于范围'
+  return { cls: 'bg-red-100 text-red-700 border-red-300', text, statusText }
+}
+
+/** 孔板固定行标列（不随孔板滚动）；cellHeightCls 需与对应孔格高度一致 */
+function PlateRowLabels({ cellHeightCls }: { cellHeightCls: string }) {
+  return (
+    <div className="shrink-0 z-10 bg-white border-r border-slate-200 pr-1 mr-0.5 sm:mr-1">
+      <div className="h-[18px] sm:h-[22px] mb-0.5 sm:mb-1" />
+      {ROWS.split('').map((letter) => (
+        <div key={letter} className={`w-4 sm:w-6 ${cellHeightCls} mb-0.5 sm:mb-1 flex items-center justify-center text-[10px] sm:text-xs text-slate-500 font-medium`}>
+          {letter}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/** 孔板列号行 */
+function PlateColNumbers() {
+  return (
+    <div className="flex gap-0.5 sm:gap-1 mb-0.5 sm:mb-1">
+      {COLS.map((c) => (
+        <div key={c} className="w-[47px] sm:w-[73px] shrink-0 text-center text-[10px] sm:text-xs text-slate-400">{c}</div>
+      ))}
+    </div>
+  )
+}
+
+/** 带「已复制」状态的导出按钮 */
+function CopyButton(props: {
+  copied: boolean
+  disabled: boolean
+  onClick: () => void
+  label: string
+  copiedLabel: string
+}) {
+  const { copied, disabled, onClick, label, copiedLabel } = props
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      disabled={disabled}
+      onClick={onClick}
+      className={copied ? 'shrink-0 border-emerald-300 bg-emerald-50 text-emerald-700' : 'shrink-0 border-teal-300 text-teal-700 hover:bg-teal-50'}
+    >
+      {copied ? (
+        <>
+          <Check className="w-4 h-4 mr-1.5" />
+          {copiedLabel}
+        </>
+      ) : (
+        <>
+          <Copy className="w-4 h-4 mr-1.5" />
+          {label}
+        </>
+      )}
+    </Button>
+  )
+}
+
+/** 选中孔位的编辑面板 */
+function SelectedCellPanel(props: {
+  r: number
+  c: number
+  cell: PlateCell
+  result: WellResult
+  unit: string
+  hasFit: boolean
+  onClose: () => void
+  onFieldChange: (r: number, c: number, field: 'group' | 'od' | 'dilution', value: string) => void
+  onNavigate: (r: number, c: number) => void
+}) {
+  const { r, c, cell, result, unit, hasFit, onClose, onFieldChange, onNavigate } = props
+  const pos = `${ROWS[r]}${c + 1}`
+  const hasOdInput = cell.od.trim() !== ''
+  return (
+    <div className="mt-3 rounded-lg border bg-slate-50 p-3 space-y-2">
+      <div className="flex items-center justify-between">
+        <span className="font-semibold text-slate-700">孔位 {pos}</span>
+        <Button variant="ghost" size="sm" className="h-7 text-slate-400" onClick={onClose}>收起</Button>
+      </div>
+      <div className="flex flex-wrap items-center gap-3">
+        <label className="flex items-center gap-2 text-sm">
+          分组
+          <Input
+            value={cell.group}
+            onChange={(e) => onFieldChange(r, c, 'group', e.target.value)}
+            placeholder="例如：对照组"
+            className="h-9 w-32 sm:w-40"
+          />
+        </label>
+        <label className="flex items-center gap-2 text-sm">
+          OD
+          <Input
+            value={cell.od}
+            inputMode="decimal"
+            onChange={(e) => onFieldChange(r, c, 'od', e.target.value)}
+            placeholder="0.000"
+            className="h-9 w-28"
+          />
+        </label>
+        <label className="flex items-center gap-2 text-sm">
+          稀释倍数
+          <Input
+            value={cell.dilution}
+            inputMode="decimal"
+            onChange={(e) => onFieldChange(r, c, 'dilution', e.target.value)}
+            placeholder="1"
+            className="h-9 w-20"
+          />
+        </label>
+        <span className="font-mono text-sm font-semibold text-teal-700">
+          浓度 = {resultText(result, hasOdInput, hasFit, { unit }) ?? SAMPLE_STATUS_TEXT[result.status]}
+        </span>
+      </div>
+      {/* 上下左右切换孔位 */}
+      <div className="flex items-center gap-1 pt-1">
+        <Button aria-label="切换到左侧孔位" variant="outline" size="icon" className="h-8 w-8" disabled={c === 0} onClick={() => onNavigate(r, c - 1)}>
+          <ChevronLeft className="w-4 h-4" />
+        </Button>
+        <Button aria-label="切换到右侧孔位" variant="outline" size="icon" className="h-8 w-8" disabled={c === 11} onClick={() => onNavigate(r, c + 1)}>
+          <ChevronRight className="w-4 h-4" />
+        </Button>
+        <Button aria-label="切换到上方孔位" variant="outline" size="icon" className="h-8 w-8" disabled={r === 0} onClick={() => onNavigate(r - 1, c)}>
+          <ChevronUp className="w-4 h-4" />
+        </Button>
+        <Button aria-label="切换到下方孔位" variant="outline" size="icon" className="h-8 w-8" disabled={r === 7} onClick={() => onNavigate(r + 1, c)}>
+          <ChevronDown className="w-4 h-4" />
+        </Button>
+        <span className="text-xs text-slate-400 ml-1">切换孔位</span>
+      </div>
+    </div>
+  )
+}
+
 export default function Home() {
   const [stds, setStds] = useState<StdRow[]>(() => Array.from({ length: 8 }, emptyStd))
   const [stdsCollapsed, setStdsCollapsed] = useState(false)
@@ -119,8 +293,6 @@ export default function Home() {
     setStdsCollapsed(true)
   }
 
-  // 局部包装函数：从闭包中捕获当前 fit / blank / minC / maxC
-  const rawConc = (od: number) => computeRawConcentration(od, fit, blankSub, stdPoints.blank)
   // 96 孔板结果（统一 WellResult，包含浓度、状态、稀释倍数校验）
   const plateResults = useMemo(
     () => computePlateResults(plate, fit, blankSub, stdPoints.blank, minC, maxC),
@@ -560,7 +732,7 @@ export default function Home() {
                               <Input value={r.dilution} onChange={(e) => updateUnk(i, 'dilution', e.target.value)} placeholder="1" className="h-8 w-16 sm:w-20" />
                             </td>
                             <td className="py-1 px-2 text-right font-mono font-semibold text-teal-700">
-                              {result.odInvalid ? 'OD 无效' : result.dilInvalid ? '稀释倍数无效' : !hasOdInput ? '—' : !fit ? '待拟合' : result.status === 'valid' && result.conc !== null ? fmt(result.conc) : '—'}
+                              {resultText(result, hasOdInput, !!fit) ?? '—'}
                             </td>
                             <td className="py-1 text-right">
                               {result.odInvalid ? (
@@ -569,8 +741,8 @@ export default function Home() {
                                 <Badge variant="destructive">稀释倍数无效</Badge>
                               ) : !hasOdInput || !fit ? null : (
                                 <Badge
-                                  variant={result.status === 'invalid' ? 'destructive' : result.status === 'valid' ? 'secondary' : 'secondary'}
-                                  className={result.status === 'valid' ? '' : result.status === 'invalid' ? '' : 'bg-amber-100 text-amber-700'}
+                                  variant={result.status === 'invalid' ? 'destructive' : 'secondary'}
+                                  className={result.status === 'below-range' || result.status === 'above-range' ? 'bg-amber-100 text-amber-700' : ''}
                                 >
                                   {SAMPLE_STATUS_TEXT[result.status]}
                                 </Badge>
@@ -630,29 +802,19 @@ export default function Home() {
                   </div>
                   <div className="flex -mx-2 px-2 sm:mx-0 sm:px-0">
                     {/* 固定行标列（不随孔板滚动） */}
-                    <div className="shrink-0 z-10 bg-white border-r border-slate-200 pr-1 mr-0.5 sm:mr-1">
-                      <div className="h-[18px] sm:h-[22px] mb-0.5 sm:mb-1" />
-                      {ROWS.split('').map((letter) => (
-                        <div key={letter} className="w-4 sm:w-6 h-9 mb-0.5 sm:mb-1 flex items-center justify-center text-[10px] sm:text-xs text-slate-500 font-medium">
-                          {letter}
-                        </div>
-                      ))}
-                    </div>
+                    <PlateRowLabels cellHeightCls="h-9" />
                     {/* 可滚动孔格区 */}
                     <div ref={odBoardRef} onScroll={syncScroll('od')} className="overflow-x-auto pb-2 flex-1">
                       <div className="inline-block">
-                        <div className="flex gap-0.5 sm:gap-1 mb-0.5 sm:mb-1">
-                          {COLS.map((c) => (
-                            <div key={c} className="w-[47px] sm:w-[73px] shrink-0 text-center text-[10px] sm:text-xs text-slate-400">{c}</div>
-                          ))}
-                        </div>
+                        <PlateColNumbers />
                         {plate.map((row, r) => (
                           <div key={r} className="flex gap-0.5 sm:gap-1 mb-0.5 sm:mb-1 items-center">
                             {row.map((cell, c) => {
                               const odText = cell.od.trim()
                               const num = parseNumber(odText)
                               const result = plateResults[r][c]
-                              const raw = num !== null && fit ? rawConc(num) : null
+                              // raw 已由 plateResults 计算，直接复用
+                              const raw = result.raw
                               const outOfRange = raw !== null && (raw < minC || raw > maxC)
                               const uncomputable = num !== null && fit && raw === null
                               const hasError = result.dilInvalid || result.odInvalid
@@ -696,71 +858,19 @@ export default function Home() {
                     </div>
                   </div>
                   {/* 选中孔位编辑面板 */}
-                  {selectedCell && (() => {
-                    const { r, c } = selectedCell
-                    const cell = plate[r][c]
-                    const pos = `${ROWS[r]}${c + 1}`
-                    const result = plateResults[r][c]
-                    const hasOdInput = cell.od.trim() !== ''
-                    return (
-                      <div className="mt-3 rounded-lg border bg-slate-50 p-3 space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="font-semibold text-slate-700">孔位 {pos}</span>
-                          <Button variant="ghost" size="sm" className="h-7 text-slate-400" onClick={() => setSelectedCell(null)}>收起</Button>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-3">
-                          <label className="flex items-center gap-2 text-sm">
-                            分组
-                            <Input
-                              value={cell.group}
-                              onChange={(e) => updatePlateCell(r, c, 'group', e.target.value)}
-                              placeholder="例如：对照组"
-                              className="h-9 w-32 sm:w-40"
-                            />
-                          </label>
-                          <label className="flex items-center gap-2 text-sm">
-                            OD
-                            <Input
-                              value={cell.od}
-                              inputMode="decimal"
-                              onChange={(e) => updatePlateCell(r, c, 'od', e.target.value)}
-                              placeholder="0.000"
-                              className="h-9 w-28"
-                            />
-                          </label>
-                          <label className="flex items-center gap-2 text-sm">
-                            稀释倍数
-                            <Input
-                              value={cell.dilution}
-                              inputMode="decimal"
-                              onChange={(e) => updatePlateCell(r, c, 'dilution', e.target.value)}
-                              placeholder="1"
-                              className="h-9 w-20"
-                            />
-                          </label>
-                          <span className="font-mono text-sm font-semibold text-teal-700">
-                            浓度 = {result.odInvalid ? 'OD 无效' : result.dilInvalid ? '稀释倍数无效' : !hasOdInput ? '—' : !fit ? '待拟合' : result.status === 'valid' && result.conc !== null ? `${fmt(result.conc)} ${unit}` : SAMPLE_STATUS_TEXT[result.status]}
-                          </span>
-                        </div>
-                        {/* 上下左右切换孔位 */}
-                        <div className="flex items-center gap-1 pt-1">
-                          <Button aria-label="切换到左侧孔位" variant="outline" size="icon" className="h-8 w-8" disabled={c === 0} onClick={() => focusOdCell(r, c - 1)}>
-                            <ChevronLeft className="w-4 h-4" />
-                          </Button>
-                          <Button aria-label="切换到右侧孔位" variant="outline" size="icon" className="h-8 w-8" disabled={c === 11} onClick={() => focusOdCell(r, c + 1)}>
-                            <ChevronRight className="w-4 h-4" />
-                          </Button>
-                          <Button aria-label="切换到上方孔位" variant="outline" size="icon" className="h-8 w-8" disabled={r === 0} onClick={() => focusOdCell(r - 1, c)}>
-                            <ChevronUp className="w-4 h-4" />
-                          </Button>
-                          <Button aria-label="切换到下方孔位" variant="outline" size="icon" className="h-8 w-8" disabled={r === 7} onClick={() => focusOdCell(r + 1, c)}>
-                            <ChevronDown className="w-4 h-4" />
-                          </Button>
-                          <span className="text-xs text-slate-400 ml-1">切换孔位</span>
-                        </div>
-                      </div>
-                    )
-                  })()}
+                  {selectedCell && (
+                    <SelectedCellPanel
+                      r={selectedCell.r}
+                      c={selectedCell.c}
+                      cell={plate[selectedCell.r][selectedCell.c]}
+                      result={plateResults[selectedCell.r][selectedCell.c]}
+                      unit={unit}
+                      hasFit={!!fit}
+                      onClose={() => setSelectedCell(null)}
+                      onFieldChange={updatePlateCell}
+                      onNavigate={focusOdCell}
+                    />
+                  )}
                 </div>
                 {/* 下板：浓度结果 */}
                 <div>
@@ -770,104 +880,37 @@ export default function Home() {
                       {!fit && <span className="ml-2 text-amber-600 font-normal">— 请先完成第 1 步拟合</span>}
                     </h3>
                     <div className="flex flex-wrap justify-end gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
+                      <CopyButton
+                        copied={copiedMode === 'concentration'}
                         disabled={!fit}
                         onClick={copyPlateConcentrations}
-                        className={copiedMode === 'concentration'
-                          ? 'shrink-0 border-emerald-300 bg-emerald-50 text-emerald-700'
-                          : 'shrink-0 border-teal-300 text-teal-700 hover:bg-teal-50'}
-                      >
-                        {copiedMode === 'concentration' ? (
-                          <>
-                            <Check className="w-4 h-4 mr-1.5" />
-                            已复制浓度
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="w-4 h-4 mr-1.5" />
-                            只复制浓度
-                          </>
-                        )}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
+                        label="只复制浓度"
+                        copiedLabel="已复制浓度"
+                      />
+                      <CopyButton
+                        copied={copiedMode === 'group-concentration'}
                         disabled={!fit}
                         onClick={copyPlateGroupsAndConcentrations}
-                        className={copiedMode === 'group-concentration'
-                          ? 'shrink-0 border-emerald-300 bg-emerald-50 text-emerald-700'
-                          : 'shrink-0 border-teal-300 text-teal-700 hover:bg-teal-50'}
-                      >
-                        {copiedMode === 'group-concentration' ? (
-                          <>
-                            <Check className="w-4 h-4 mr-1.5" />
-                            已复制分组+浓度
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="w-4 h-4 mr-1.5" />
-                            复制分组+浓度
-                          </>
-                        )}
-                      </Button>
+                        label="复制分组+浓度"
+                        copiedLabel="已复制分组+浓度"
+                      />
                     </div>
                   </div>
                   <div className="flex -mx-2 px-2 sm:mx-0 sm:px-0">
                     {/* 固定行标列（不随孔板滚动） */}
-                    <div className="shrink-0 z-10 bg-white border-r border-slate-200 pr-1 mr-0.5 sm:mr-1">
-                      <div className="h-[18px] sm:h-[22px] mb-0.5 sm:mb-1" />
-                      {ROWS.split('').map((letter) => (
-                        <div key={letter} className="w-4 sm:w-6 h-12 sm:h-14 mb-0.5 sm:mb-1 flex items-center justify-center text-[10px] sm:text-xs text-slate-500 font-medium">
-                          {letter}
-                        </div>
-                      ))}
-                    </div>
+                    <PlateRowLabels cellHeightCls="h-12 sm:h-14" />
                     {/* 可滚动孔格区 */}
                     <div ref={concBoardRef} onScroll={syncScroll('conc')} className="overflow-x-auto pb-2 flex-1">
                       <div className="inline-block">
-                        <div className="flex gap-0.5 sm:gap-1 mb-0.5 sm:mb-1">
-                          {COLS.map((c) => (
-                            <div key={c} className="w-[47px] sm:w-[73px] shrink-0 text-center text-[10px] sm:text-xs text-slate-400">{c}</div>
-                          ))}
-                        </div>
+                        <PlateColNumbers />
                         {plateResults.map((row, r) => (
                           <div key={r} className="flex gap-0.5 sm:gap-1 mb-0.5 sm:mb-1 items-center">
-                          {row.map((result, c) => {
-                            const cell = plate[r]?.[c]
-                            const group = cell?.group.trim() ?? ''
-                            const hasOdInput = (cell?.od ?? '').trim() !== ''
-                            let cls = 'bg-white text-slate-300 border-slate-200'
-                            let text = '—'
-                            let statusText = ''
-                            if (result.odInvalid) {
-                              cls = 'bg-red-100 text-red-700 border-red-300'
-                              text = 'OD 无效'
-                              statusText = 'OD 无效'
-                            } else if (result.dilInvalid) {
-                              cls = 'bg-red-100 text-red-700 border-red-300'
-                              text = '稀释倍数无效'
-                              statusText = '稀释倍数无效'
-                            } else if (!hasOdInput) {
-                              // 保持空白默认样式
-                            } else if (!fit) {
-                              cls = 'bg-white text-slate-400'
-                              text = '待拟合'
-                              statusText = '待拟合'
-                            } else {
-                              statusText = SAMPLE_STATUS_TEXT[result.status]
-                              if (result.status === 'valid' && result.conc !== null) {
-                                cls = 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                                text = fmt(result.conc, 3)
-                              } else {
-                                cls = 'bg-red-100 text-red-700 border-red-300'
-                                text = result.status === 'invalid' ? 'N/A' : result.status === 'below-range' ? '低于范围' : '高于范围'
-                              }
-                            }
-                            const selected = selectedCell?.r === r && selectedCell?.c === c
+                            {row.map((result, c) => {
+                              const cell = plate[r]?.[c]
+                              const group = cell?.group.trim() ?? ''
+                              const hasOdInput = (cell?.od ?? '').trim() !== ''
+                              const { cls, text, statusText } = boardCellDisplay(result, hasOdInput, !!fit)
+                              const selected = selectedCell?.r === r && selectedCell?.c === c
                             return (
                               <button
                                 key={c}

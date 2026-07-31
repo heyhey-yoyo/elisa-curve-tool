@@ -98,13 +98,9 @@ describe('fitFourPL', () => {
     expect(res!.residuals).toHaveLength(15)
   })
 
-  it('平坦数据：梯度为零报 tolerance，jacobianRankDeficient 为 true', () => {
+  it('平坦数据：响应无变异，拒绝不可反算的退化曲线', () => {
     const res = fitFourPL(CONCS.map((conc) => ({ conc, od: 1 })))
-    expect(res).not.toBeNull()
-    // 梯度为零 → 数学上确为驻点
-    expect(res!.reason).toBe('tolerance')
-    // b、c 不可辨识 → Hessian 奇异
-    expect(res!.diagnostics.jacobianRankDeficient).toBe(true)
+    expect(res).toBeNull()
   })
 
   it('超宽范围的阶跃数据：返回 SSE 最优的有限解', () => {

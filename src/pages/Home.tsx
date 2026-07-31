@@ -353,7 +353,7 @@ export default function Home() {
                           <Input value={r.od} onChange={(e) => updateStd(i, 'od', e.target.value)} placeholder="0.000" className="h-8 w-24 sm:w-36" />
                         </td>
                         <td>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-red-500" onClick={() => setStds((p) => p.filter((_, k) => k !== i))}>
+                          <Button aria-label={`删除第 ${i + 1} 个标准品`} variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-red-500" onClick={() => setStds((p) => p.filter((_, k) => k !== i))}>
                             <Trash2 className="w-4 h-4" />
                           </Button>
                         </td>
@@ -492,7 +492,7 @@ export default function Home() {
                         <tr key={i} className="border-b border-slate-100">
                           <td className="py-1.5 font-mono">{fmt(r.conc)}</td>
                           <td className="py-1.5 text-right font-mono">{(blankSub ? r.od + stdPoints.blank : r.od).toFixed(3)}</td>
-                          <td className="py-1.5 text-right font-mono">{fourPL(r.conc, fit.params).toFixed(3)}</td>
+                          <td className="py-1.5 text-right font-mono">{(fourPL(r.conc, fit.params) + (blankSub ? stdPoints.blank : 0)).toFixed(3)}</td>
                           <td className="py-1.5 text-right font-mono">{r.back !== null ? fmt(r.back) : '—'}</td>
                           <td className={`py-1.5 text-right font-mono ${r.recovery !== null && (r.recovery < 80 || r.recovery > 120) ? 'text-amber-600 font-semibold' : ''}`}>
                             {r.recovery !== null ? `${r.recovery.toFixed(1)}%` : '—'}
@@ -547,6 +547,7 @@ export default function Home() {
                     <tbody>
                       {unkRows.map((r, i) => {
                         const result = computeUnkResult(r.od, r.dilution, fit, blankSub, stdPoints.blank, minC, maxC)
+                        const hasOdInput = r.od.trim() !== ''
                         return (
                           <tr key={i} className="border-b border-slate-100">
                             <td className="py-1 pr-2">
@@ -559,14 +560,14 @@ export default function Home() {
                               <Input value={r.dilution} onChange={(e) => updateUnk(i, 'dilution', e.target.value)} placeholder="1" className="h-8 w-16 sm:w-20" />
                             </td>
                             <td className="py-1 px-2 text-right font-mono font-semibold text-teal-700">
-                              {result.odInvalid ? 'OD 无效' : result.dilInvalid ? '稀释倍数无效' : !fit ? '待拟合' : result.status === 'valid' && result.conc !== null ? fmt(result.conc) : '—'}
+                              {result.odInvalid ? 'OD 无效' : result.dilInvalid ? '稀释倍数无效' : !hasOdInput ? '—' : !fit ? '待拟合' : result.status === 'valid' && result.conc !== null ? fmt(result.conc) : '—'}
                             </td>
                             <td className="py-1 text-right">
                               {result.odInvalid ? (
                                 <Badge variant="destructive">OD 无效</Badge>
                               ) : result.dilInvalid ? (
                                 <Badge variant="destructive">稀释倍数无效</Badge>
-                              ) : !fit ? null : (
+                              ) : !hasOdInput || !fit ? null : (
                                 <Badge
                                   variant={result.status === 'invalid' ? 'destructive' : result.status === 'valid' ? 'secondary' : 'secondary'}
                                   className={result.status === 'valid' ? '' : result.status === 'invalid' ? '' : 'bg-amber-100 text-amber-700'}
@@ -576,7 +577,7 @@ export default function Home() {
                               )}
                             </td>
                             <td>
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-red-500" onClick={() => setUnkRows((p) => p.filter((_, k) => k !== i))}>
+                              <Button aria-label={`删除${r.name.trim() || `样本 ${i + 1}`}`} variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-red-500" onClick={() => setUnkRows((p) => p.filter((_, k) => k !== i))}>
                                 <Trash2 className="w-4 h-4" />
                               </Button>
                             </td>
@@ -743,16 +744,16 @@ export default function Home() {
                         </div>
                         {/* 上下左右切换孔位 */}
                         <div className="flex items-center gap-1 pt-1">
-                          <Button variant="outline" size="icon" className="h-8 w-8" disabled={c === 0} onClick={() => focusOdCell(r, c - 1)}>
+                          <Button aria-label="切换到左侧孔位" variant="outline" size="icon" className="h-8 w-8" disabled={c === 0} onClick={() => focusOdCell(r, c - 1)}>
                             <ChevronLeft className="w-4 h-4" />
                           </Button>
-                          <Button variant="outline" size="icon" className="h-8 w-8" disabled={c === 11} onClick={() => focusOdCell(r, c + 1)}>
+                          <Button aria-label="切换到右侧孔位" variant="outline" size="icon" className="h-8 w-8" disabled={c === 11} onClick={() => focusOdCell(r, c + 1)}>
                             <ChevronRight className="w-4 h-4" />
                           </Button>
-                          <Button variant="outline" size="icon" className="h-8 w-8" disabled={r === 0} onClick={() => focusOdCell(r - 1, c)}>
+                          <Button aria-label="切换到上方孔位" variant="outline" size="icon" className="h-8 w-8" disabled={r === 0} onClick={() => focusOdCell(r - 1, c)}>
                             <ChevronUp className="w-4 h-4" />
                           </Button>
-                          <Button variant="outline" size="icon" className="h-8 w-8" disabled={r === 7} onClick={() => focusOdCell(r + 1, c)}>
+                          <Button aria-label="切换到下方孔位" variant="outline" size="icon" className="h-8 w-8" disabled={r === 7} onClick={() => focusOdCell(r + 1, c)}>
                             <ChevronDown className="w-4 h-4" />
                           </Button>
                           <span className="text-xs text-slate-400 ml-1">切换孔位</span>

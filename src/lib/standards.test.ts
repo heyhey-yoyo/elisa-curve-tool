@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { validateStandardRows, type StdRow } from './standards'
+import { validateStandards, validateStandardRows, type StdRow } from './standards'
 
 const emptyRow = (): StdRow => ({ conc: '', od: '' })
 
@@ -117,5 +117,18 @@ describe('validateStandardRows', () => {
     const err = validateStandardRows(rows, true)
     expect(err).not.toBeNull()
     expect(err!).toContain('第 2 行')
+  })
+})
+
+describe('validateStandards', () => {
+  it('OD 全部相同时拒绝拟合并给出明确提示', () => {
+    const err = validateStandards([1, 2, 4, 8, 16].map((conc) => ({ conc, od: 1 })))
+    expect(err).not.toBeNull()
+    expect(err!).toContain('OD 全部相同')
+  })
+
+  it('存在响应变化时通过', () => {
+    const err = validateStandards([1, 2, 4, 8, 16].map((conc, i) => ({ conc, od: 1 + i * 0.1 })))
+    expect(err).toBeNull()
   })
 })

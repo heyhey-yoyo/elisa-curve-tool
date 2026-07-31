@@ -37,6 +37,13 @@ export function validateStandards(pts: StandardPoint[]): string | null {
   if (uniqueConcs.size < 5) {
     return '至少需要 5 个不同的标准品浓度（重复孔不算作新的浓度水平）。'
   }
+
+  // OD 完全没有变化时，4PL 的上下渐近线重合，反函数无法计算任何浓度。
+  // 在进入优化器前明确拒绝，避免页面把 R²=NaN 的退化结果显示为成功拟合。
+  const ods = pts.map((p) => p.od)
+  if (Math.max(...ods) === Math.min(...ods)) {
+    return '标准品 OD 全部相同，缺少可用于拟合的响应变化。请检查标准品配制、读板结果或数据录入。'
+  }
   return null
 }
 

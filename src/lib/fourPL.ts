@@ -238,6 +238,11 @@ export function fitFourPL(points: StandardPoint[]): FitResult | null {
   const uniqueConcs = new Set(valid.map((p) => p.conc))
   if (uniqueConcs.size < 5) return null
 
+  // 响应无变异时 4PL 退化为 a=d 的水平线，反函数对任何 OD 都不可用。
+  // 即使优化器会把零梯度报告为 tolerance，也不能将其视为可用拟合。
+  const validODs = valid.map((p) => p.od)
+  if (Math.max(...validODs) === Math.min(...validODs)) return null
+
   // 将 OD 归一化到 O(1) 量级再拟合，避免 OD 尺度过小 / 过大导致数值问题。
   // 4PL 对 a、d 是线性的，拟合结束后将 a、d 按比例还原即可（b、c 不受影响）
   const yScale = Math.max(...valid.map((p) => Math.abs(p.od)), 1e-300)

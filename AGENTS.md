@@ -39,7 +39,7 @@ npm run test       # Vitest 单元测试（src/lib/fourPL.test.ts）
 
 ## 目录结构与代码组织
 
-```
+```text
 src/
 ├── main.tsx          # 入口：createRoot + StrictMode + BrowserRouter
 ├── App.tsx           # 路由表（目前只有 / → Home）

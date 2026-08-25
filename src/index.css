@@ -88,3 +88,9 @@ body{font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI"
 #root main [class*="text-slate-900"],#root main [class*="text-slate-800"]{color:#24221f!important}
 #root main [class*="text-slate-500"],#root main [class*="text-slate-400"]{color:#6f6a62!important}
 #root main [class*="border-slate-"]{border-color:rgba(36,34,31,.18)!important}
+
+/* Visual QA baseline for the tool body; the protected YDchen Tools header is untouched. */
+:root{--muted-foreground:29 8% 36%}
+#root main{font-size:15px}
+#root main [class~="text-xs"]{font-size:.8125rem!important}
+#root main [class~="text-sm"]{font-size:.9rem!important}

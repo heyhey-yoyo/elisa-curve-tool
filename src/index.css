@@ -73,3 +73,18 @@
     @apply bg-background text-foreground;
   }
 }
+/* Portfolio visual system for the tool body. The YDchen Tools header is intentionally unchanged. */
+:root{--background:38 33% 93%;--foreground:30 7% 14%;--card:40 100% 99%;--card-foreground:30 7% 14%;--popover:40 100% 99%;--popover-foreground:30 7% 14%;--primary:14 54% 50%;--primary-foreground:40 100% 99%;--secondary:34 28% 89%;--secondary-foreground:30 7% 14%;--muted:34 28% 89%;--muted-foreground:29 7% 42%;--accent:14 54% 50%;--accent-foreground:40 100% 99%;--border:30 12% 78%;--input:30 12% 78%;--ring:14 54% 50%;--radius:0rem}
+body{font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;background:#f3eee5}
+#root>div{background:#f3eee5!important;color:#24221f}
+#root>div>main{max-width:1440px!important;padding-left:clamp(22px,4.5vw,72px)!important;padding-right:clamp(22px,4.5vw,72px)!important}
+#root main [data-slot="card"]{background:rgba(255,252,247,.84)!important;border-color:rgba(36,34,31,.18)!important;border-radius:0!important;box-shadow:none!important}
+#root main h2,#root main h3{font-family:Georgia,"Times New Roman","Songti SC","STSong",serif;font-weight:400}
+#root main input,#root main button,#root main select,#root main textarea{border-radius:0}
+#root main [class*="bg-teal-"]{background-color:#c15f3c!important}
+#root main [class*="text-teal-"]{color:#a94f31!important}
+#root main [class*="border-teal-"]{border-color:rgba(193,95,60,.35)!important}
+#root main [class*="bg-slate-50"],#root main [class*="bg-slate-100"]{background-color:#ebe4d8!important}
+#root main [class*="text-slate-900"],#root main [class*="text-slate-800"]{color:#24221f!important}
+#root main [class*="text-slate-500"],#root main [class*="text-slate-400"]{color:#6f6a62!important}
+#root main [class*="border-slate-"]{border-color:rgba(36,34,31,.18)!important}

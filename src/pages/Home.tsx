@@ -137,7 +137,7 @@ function CopyButton(props: {
       size="sm"
       disabled={disabled}
       onClick={onClick}
-      className={copied ? 'shrink-0 border-emerald-300 bg-emerald-50 text-emerald-700' : 'shrink-0 border-teal-300 text-teal-700 hover:bg-teal-50'}
+      className={`copy-concentration-button ${copied ? 'is-copied' : ''} shrink-0`}
     >
       {copied ? (
         <>

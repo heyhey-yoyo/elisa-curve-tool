@@ -39,7 +39,7 @@
 要求 Node.js 20。
 
 ```bash
-npm install     # 安装依赖
+npm ci          # 按锁文件安装依赖
 npm run dev     # 开发服务器（http://localhost:3000，支持 HMR）
 npm run build   # 生产构建（先 tsc -b 类型检查，再 vite build 输出到 dist/）
 npm run preview # 预览生产构建
@@ -48,6 +48,8 @@ npm run test    # Vitest 单元测试
 ```
 
 提交代码前请确保 `npm run build`、`npm run lint` 与 `npm run test` 均通过。
+
+`package-lock.json` 固定 React Router、Vite、PostCSS 与间接依赖的已验证版本。安全更新只采用同一主版本内的稳定版本，不使用 `npm audit fix --force`。
 
 ## 目录结构
 

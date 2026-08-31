@@ -2,13 +2,7 @@
 
 纯前端单页应用，在浏览器中完成 ELISA 标准曲线的四参数 Logistic（4PL）拟合与样本浓度计算。无后端、无数据持久化，所有计算均在客户端完成。
 
-## 界面风格
-
-主体采用 `ydchen-portfolio` 的暖米白、浅灰与赤陶色视觉系统，使用衬线标题和扁平化工作区；`YDchen Tools` 页眉结构、字体、颜色和布局保持不变。
-
-工具主体采用 15px 字号基线，操作与结果标签不小于 13px；桌面和手机端不得出现页面整体横向溢出，受保护页眉不参与字号重写。
-
-## 功能特性
+## 主要功能
 
 - **4PL 标曲拟合**：`y = d + (a − d) / (1 + (x/c)^b)`，自实现 Levenberg-Marquardt 非线性最小二乘（对数浓度空间拟合，多起点重启取最优），输出参数 a/b/c(EC50)/d、R² 与收敛状态
   - 约定 b > 0、c > 0，曲线方向由 a 与 d 的大小关系决定（a > d 降低，a < d 升高）
@@ -26,15 +20,15 @@
 
 页面首次打开为标准品空表，点击「载入示例」可填入示例数据体验完整流程。
 
-## 技术栈
+## 界面风格
 
-- React 19 + TypeScript（strict）+ Vite 7
-- 路由：react-router v7
-- UI：shadcn/ui + Radix UI + Tailwind CSS v3.4 + lucide-react
-- 图表：recharts v2
-- 测试：Vitest
+主体采用 `ydchen-portfolio` 的暖米白、浅灰与赤陶色视觉系统，使用衬线标题和扁平化工作区；`YDchen Tools` 页眉结构、字体、颜色和布局保持不变。工具主体采用 15px 字号基线，操作与结果标签不小于 13px；桌面和手机端不得出现页面整体横向溢出。
 
-## 开发
+## 数据与隐私
+
+应用不发送网络请求、不存储用户数据，无认证逻辑，无环境变量 / 密钥。所有数据只停留在当前浏览器会话中。
+
+## 本地运行
 
 要求 Node.js 20。
 
@@ -49,61 +43,20 @@ npm run test    # Vitest 单元测试
 
 提交代码前请确保 `npm run build`、`npm run lint` 与 `npm run test` 均通过。
 
-`package-lock.json` 固定 React Router、Vite、PostCSS 与间接依赖的已验证版本。安全更新只采用同一主版本内的稳定版本，不使用 `npm audit fix --force`。
-
-## 目录结构
-
-```text
-src/
-├── main.tsx            # 入口
-├── App.tsx             # 路由表（/ → Home）
-├── pages/
-│   └── Home.tsx        # 全部业务页面：标准品录入、拟合、图表、回算表、
-│                       # 96 孔板 / 映射两种浓度计算模式、剪贴板导出
-│                       # （孔板行/列标签、复制按钮、选中孔位面板等为文件内小组件）
-├── lib/
-│   ├── fourPL.ts       # 核心算法：4PL 正/反函数、LM 拟合、曲线点生成、诊断
-│   ├── fourPL.test.ts  # 算法单元测试（Vitest）
-│   ├── parsing.ts      # 严格十进制数字解析
-│   ├── parsing.test.ts
-│   ├── standards.ts    # 标准品数据处理与逐行校验
-│   ├── standards.test.ts
-│   ├── sample.ts       # 样本浓度计算、96 孔板结果、回算表
-│   ├── sample.test.ts
-│   └── utils.ts        # cn() —— clsx + tailwind-merge
-├── hooks/
-│   └── use-mobile.ts   # 移动端断点 hook
-└── components/ui/      # shadcn/ui 生成的组件
-```
-
 ## 部署
 
-纯静态站点。`npm run build` 产出 `dist/`，因 Vite 配置 `base: './'`，可部署到任意静态托管的任意子路径（GitHub Pages、对象存储、CDN 等），无需服务端配置。
-
-## 注意事项
-
-- 应用不发送网络请求、不存储用户数据，无认证逻辑，无环境变量 / 密钥。
-- 算法正确性是核心价值：修改 `src/lib/fourPL.ts` 后请确保 `npm run test` 全绿，并用页面示例数据（R² 应 ≥ 0.99）回归验证。
-- `fourPLInverse` 对超出渐近线区间的 OD 返回 `null`，页面据此显示「无法计算 / N/A」。
-- 浓度为 0 的标准品行只用于空白校正，不参与拟合。
+纯静态站点。`npm run build` 产出 `dist/`，因 Vite 配置 `base: './'`，可部署到任意静态托管的任意子路径（Cloudflare Pages、GitHub Pages、对象存储、CDN 等），无需服务端配置。
 
 ---
 
-> AI 编程代理请阅读 [AGENTS.md](./AGENTS.md) 了解代码架构、测试策略与开发约定。
+> AI 编程代理请阅读 [AGENTS.md](./AGENTS.md) 了解代码架构、测试与开发约定。
 
 ---
 
 ## AI 维护提醒
 
-> **⚠️ 任何修改此项目的 AI 代理（Claude Code、Cursor、Copilot 等）都必须同步更新本文件与 AGENTS.md。**
+> **⚠️ 任何修改此项目的 AI 代理都必须同步更新本文件与 [AGENTS.md](./AGENTS.md)。**
 >
 > - 新增功能 → 在 README 中添加用户可理解的说明
-> - 新增/删除文件 → 更新本文和 AGENTS.md 中的文件清单
-> - 修改架构 → 更新 AGENTS.md 的架构说明
 > - 部署方式变更 → 同步更新本文部署章节
-> - 保持 **README 面向人类用户**，**AGENTS.md 面向 AI 代理**，两份文件不可互相替代
-
-
-## 项目标志
-
-浏览器标题栏使用统一系列的项目专属 `project-mark.svg`。页面中的 `YDchen Tools` 文字页眉保持原有结构、尺寸与样式，不使用项目标志替换。
+> - 版本号以 GitHub Release 为准（当前 v1.0.0），页面不显示版本号

@@ -15,7 +15,7 @@
 
 - **React 19 + TypeScript（strict）+ Vite 7**（`@vitejs/plugin-react`，dev 端口 3000，`base: './'` 支持相对路径部署）
 - **路由**：react-router v7（`BrowserRouter`，目前仅 `/` 一条路由）
-- **UI**：shadcn/ui（new-york 风格，组件已生成在 `src/components/ui/`，共 50+ 个）+ Radix UI primitives + Tailwind CSS v3.4（CSS 变量主题，slate 基色）+ lucide-react 图标 + tailwindcss-animate
+- **UI**：shadcn/ui（new-york 风格，组件已生成在 `src/components/ui/`，共 50+ 个）+ Radix UI primitives + Tailwind CSS v3.4（CSS 变量主题；shadcn 默认 slate 主题已被 `src/index.css` 的 ydchen-portfolio 暖米白/赤陶色变量覆盖）+ lucide-react 图标 + tailwindcss-animate
 - **图表**：recharts v2
 - **其他**：zod / react-hook-form / @hookform/resolvers（shadcn form 组件的配套依赖，业务代码暂未使用）
 - **开发工具**：`kimi-plugin-inspect-react`（Vite 插件，用于元素检查，勿移除）
@@ -38,10 +38,15 @@
 | `src/lib/utils.ts` | cn() —— clsx + tailwind-merge（shadcn 约定） |
 | `src/hooks/use-mobile.ts` | shadcn 附带的移动端断点 hook |
 | `src/components/ui/` | shadcn/ui 生成的基础组件，勿手写修改，通过 shadcn CLI 增删 |
-| `src/index.css` | Tailwind 指令 + 主题 CSS 变量（:root / .dark） |
+| `index.html` | Vite 入口 HTML |
+| `src/index.css` | Tailwind 指令 + 主题 CSS 变量（:root / .dark；含暖米白/赤陶色变量覆盖与 `teal-*` → 赤陶色强制映射） |
 | `src/App.css` | 少量全局样式 |
+| `public/project-mark.svg` | 项目专属标志（favicon） |
+| `package.json` / `package-lock.json` | npm 清单与锁定依赖 |
+| `LICENSE` | MIT 许可证 |
+| `.gitignore` | Git 忽略规则 |
 
-关键配置文件：`vite.config.ts`（`@` → `./src` 别名、端口 3000、`base: './'`）、`tailwind.config.js`、`components.json`（shadcn 配置）、`tsconfig.app.json`（strict、`@/*` paths）、`eslint.config.js`。
+关键配置文件：`vite.config.ts`（`@` → `./src` 别名、端口 3000、`base: './'`）、`tailwind.config.js`、`postcss.config.js`、`components.json`（shadcn 配置）、`tsconfig.json` / `tsconfig.app.json`（strict、`@/*` paths）/ `tsconfig.node.json`、`eslint.config.js`。
 
 ## 运行与构建
 
@@ -51,7 +56,7 @@ npm run dev        # 开发服务器（http://localhost:3000，支持 HMR）
 npm run build      # 生产构建：先 tsc -b 做类型检查，再 vite build 输出到 dist/
 npm run preview    # 预览生产构建
 npm run lint       # ESLint 检查（eslint.config.js，flat config）
-npm run test       # Vitest 单元测试（src/lib/fourPL.test.ts）
+npm run test       # Vitest 单元测试（src/lib/*.test.ts）
 ```
 
 要求 Node.js 20。提交代码前请确保 `npm run build`、`npm run lint` 与 `npm run test` 均通过（`build` 中的 `tsc -b` 即类型检查）。保持 `package-lock.json` 与 package 清单同步；安全修复仅接受稳定的兼容版本，不使用 `npm audit fix --force`。
@@ -64,7 +69,7 @@ npm run test       # Vitest 单元测试（src/lib/fourPL.test.ts）
 
 - **代码注释与 UI 文案使用中文**；标识符、类型名用英文
 - 一律使用 `@/` 路径别名导入（如 `@/components/ui/button`、`@/lib/fourPL`），不用相对路径跨目录引用
-- UI 组件一律从 `@/components/ui/*` 导入 shadcn 组件，用 `cn()` 合并 Tailwind 类名；主题色为 teal（主按钮、选中态、拟合曲线）
+- UI 组件一律从 `@/components/ui/*` 导入 shadcn 组件，用 `cn()` 合并 Tailwind 类名；源码中的 `teal-*` 类名被 `src/index.css` 强制映射为赤陶色（`#c15f3c`），实际主题色为赤陶（主按钮、选中态、拟合曲线）
 - 纯图标按钮（无可见文本）必须添加 `aria-label`
 - TypeScript 严格模式生效：`noUnusedLocals`、`noUnusedParameters`、`verbatimModuleSyntax`、`erasableSyntaxOnly`
 - `eslint.config.js` 对 `src/components/ui/**`（shadcn 生成代码）关闭了 `react-refresh/only-export-components` 与 `react-hooks/purity` 两条规则，属有意豁免，不要为通过 lint 去改这些生成文件
@@ -92,7 +97,7 @@ npm run test       # Vitest 单元测试（src/lib/fourPL.test.ts）
 
 ## 标志维护约定
 
-`YDchen Tools` 文字页眉是受保护的品牌区域，必须保持原结构、尺寸与样式；项目专属统一标志仅用于 favicon 或现有非页眉标志，不得改变页面布局。
+`YDchen Tools` 文字页眉是受保护的品牌区域，必须保持原结构、尺寸与样式；项目专属统一标志 `public/project-mark.svg` 仅用于 favicon 或现有非页眉标志，不得改变页面布局。
 
 ---
 

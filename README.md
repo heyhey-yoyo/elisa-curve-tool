@@ -47,6 +47,10 @@ npm run test    # Vitest 单元测试
 
 纯静态站点。`npm run build` 产出 `dist/`，因 Vite 配置 `base: './'`，可部署到任意静态托管的任意子路径（Cloudflare Pages、GitHub Pages、对象存储、CDN 等），无需服务端配置。
 
+## License
+
+MIT
+
 ---
 
 > AI 编程代理请阅读 [AGENTS.md](./AGENTS.md) 了解代码架构、测试与开发约定。
@@ -59,4 +63,4 @@ npm run test    # Vitest 单元测试
 >
 > - 新增功能 → 在 README 中添加用户可理解的说明
 > - 部署方式变更 → 同步更新本文部署章节
-> - 版本号以 GitHub Release 为准（当前 v1.0.0），页面不显示版本号
+> - 版本号以 GitHub Release 为准，页面不显示版本号

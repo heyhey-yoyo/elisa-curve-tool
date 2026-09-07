@@ -479,7 +479,6 @@ export default function Home() {
           <div className="w-px h-8 sm:h-9 bg-slate-300/80 shrink-0" aria-hidden="true" />
           <div className="min-w-0">
             <h1 className="text-base sm:text-lg font-semibold text-slate-800 leading-tight">ELISA 4PL Curve Tool</h1>
-            <p className="text-xs sm:text-sm text-slate-500 mt-0.5">4PL 标曲拟合 · 浓度计算 · 96 孔板换算</p>
           </div>
         </div>
       </header>
@@ -625,18 +624,18 @@ export default function Home() {
                       <YAxis tick={{ fontSize: 11 }} label={{ value: 'OD', angle: -90, position: 'insideLeft', fontSize: 12 }} />
                       <Tooltip formatter={(v: number, name: string) => [fmt(v), name]} labelFormatter={(v: number) => `浓度: ${fmt(v)} ${unit}`} />
                       {/* 标准曲线范围高亮 */}
-                      <ReferenceArea x1={minC} x2={maxC} fill="#0d9488" fillOpacity={0.06} />
-                      <ReferenceLine x={minC} stroke="#0d9488" strokeOpacity={0.5} strokeDasharray="4 4" />
-                      <ReferenceLine x={maxC} stroke="#0d9488" strokeOpacity={0.5} strokeDasharray="4 4" />
-                      <Line data={chartData.curve} dataKey="od" dot={false} stroke="#0d9488" strokeWidth={2.5} name="4PL 拟合曲线" isAnimationActive={false} />
-                      <Scatter data={chartData.scatter} dataKey="od" fill="#1e40af" name="标准品" />
+                      <ReferenceArea x1={minC} x2={maxC} fill="#c15f3c" fillOpacity={0.06} />
+                      <ReferenceLine x={minC} stroke="#c15f3c" strokeOpacity={0.5} strokeDasharray="4 4" />
+                      <ReferenceLine x={maxC} stroke="#c15f3c" strokeOpacity={0.5} strokeDasharray="4 4" />
+                      <Line data={chartData.curve} dataKey="od" dot={false} stroke="#c15f3c" strokeWidth={2.5} name="4PL 拟合曲线" isAnimationActive={false} />
+                      <Scatter data={chartData.scatter} dataKey="od" fill="#24221f" name="标准品" />
                       <Scatter data={chartData.unkDots} dataKey="od" fill="#dc2626" shape="diamond" name="未知样本" />
-                      <ReferenceLine x={fit.params.c} stroke="#94a3b8" strokeDasharray="4 4" label={{ value: 'EC50', position: 'insideTopRight', fontSize: 11 }} />
+                      <ReferenceLine x={fit.params.c} stroke="#6f6a62" strokeDasharray="4 4" label={{ value: 'EC50', position: 'insideTopRight', fontSize: 11 }} />
                     </ComposedChart>
                   </ResponsiveContainer>
                   <div className="flex justify-center gap-6 text-xs text-slate-500 mt-1">
                     <span className="flex items-center gap-1"><span className="w-4 h-0.5 bg-teal-600 inline-block"></span>拟合曲线</span>
-                    <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-blue-800 inline-block"></span>标准品</span>
+                    <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-[#24221f] inline-block"></span>标准品</span>
                     <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rotate-45 bg-red-600 inline-block"></span>未知样本</span>
                   </div>
                 </CardContent>

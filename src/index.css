@@ -84,10 +84,13 @@ body{font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI"
 #root main [class*="bg-teal-"]{background-color:#c15f3c!important}
 #root main [class*="text-teal-"]{color:#a94f31!important}
 #root main [class*="border-teal-"]{border-color:rgba(193,95,60,.35)!important}
+#root main [class*="accent-teal-"]{accent-color:#c15f3c!important}
+#root main [class*="ring-teal-"]{--tw-ring-color:rgba(193,95,60,.5)!important}
 #root main [class*="bg-slate-50"],#root main [class*="bg-slate-100"]{background-color:#ebe4d8!important}
 #root main [class*="text-slate-900"],#root main [class*="text-slate-800"]{color:#24221f!important}
 #root main [class*="text-slate-500"],#root main [class*="text-slate-400"]{color:#6f6a62!important}
 #root main [class*="border-slate-"]{border-color:rgba(36,34,31,.18)!important}
+#root header [class*="text-slate-400"],#root header [class*="text-slate-500"]{color:#6f6a62!important}
 
 /* Visual QA baseline for the tool body; the protected YDchen Tools header is untouched. */
 :root{--muted-foreground:29 8% 36%}

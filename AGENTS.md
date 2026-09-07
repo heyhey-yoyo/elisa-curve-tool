@@ -69,7 +69,7 @@ npm run test       # Vitest 单元测试（src/lib/*.test.ts）
 
 - **代码注释与 UI 文案使用中文**；标识符、类型名用英文
 - 一律使用 `@/` 路径别名导入（如 `@/components/ui/button`、`@/lib/fourPL`），不用相对路径跨目录引用
-- UI 组件一律从 `@/components/ui/*` 导入 shadcn 组件，用 `cn()` 合并 Tailwind 类名；源码中的 `teal-*` 类名被 `src/index.css` 强制映射为赤陶色（`#c15f3c`），实际主题色为赤陶（主按钮、选中态、拟合曲线）
+- UI 组件一律从 `@/components/ui/*` 导入 shadcn 组件，用 `cn()` 合并 Tailwind 类名；源码中的 `teal-*` 类名（含 `accent-teal-`、`ring-teal-`）被 `src/index.css` 强制映射为赤陶色（`#c15f3c`），页眉浅灰 `text-slate-400/500` 映射为 `#6f6a62`，图表 SVG 颜色直接写死 `#c15f3c`（拟合曲线）/`#24221f`（标准品），实际主题色为赤陶（主按钮、选中态、拟合曲线）
 - 纯图标按钮（无可见文本）必须添加 `aria-label`
 - TypeScript 严格模式生效：`noUnusedLocals`、`noUnusedParameters`、`verbatimModuleSyntax`、`erasableSyntaxOnly`
 - `eslint.config.js` 对 `src/components/ui/**`（shadcn 生成代码）关闭了 `react-refresh/only-export-components` 与 `react-hooks/purity` 两条规则，属有意豁免，不要为通过 lint 去改这些生成文件

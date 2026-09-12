@@ -39,7 +39,7 @@
 | `src/hooks/use-mobile.ts` | shadcn 附带的移动端断点 hook |
 | `src/components/ui/` | shadcn/ui 生成的基础组件，勿手写修改，通过 shadcn CLI 增删 |
 | `index.html` | Vite 入口 HTML |
-| `src/index.css` | Tailwind 指令 + 主题 CSS 变量（:root / .dark；含暖米白/赤陶色变量覆盖与 `teal-*` → 赤陶色强制映射） |
+| `src/index.css` | Tailwind 指令 + 主题 CSS 变量（:root / .dark；含暖米白/赤陶色变量覆盖、`teal-*` → 赤陶色强制映射与热图 `--heat-1..4` 色阶变量） |
 | `src/App.css` | 少量全局样式 |
 | `public/project-mark.svg` | 项目专属标志（favicon） |
 | `package.json` / `package-lock.json` | npm 清单与锁定依赖 |
@@ -69,7 +69,7 @@ npm run test       # Vitest 单元测试（src/lib/*.test.ts）
 
 - **代码注释与 UI 文案使用中文**；标识符、类型名用英文
 - 一律使用 `@/` 路径别名导入（如 `@/components/ui/button`、`@/lib/fourPL`），不用相对路径跨目录引用
-- UI 组件一律从 `@/components/ui/*` 导入 shadcn 组件，用 `cn()` 合并 Tailwind 类名；源码中的 `teal-*` 类名（含 `accent-teal-`、`ring-teal-`）被 `src/index.css` 强制映射为赤陶色（`#c15f3c`），页眉浅灰 `text-slate-400/500` 映射为 `#6f6a62`，图表 SVG 颜色直接写死 `#c15f3c`（拟合曲线）/`#24221f`（标准品），实际主题色为赤陶（主按钮、选中态、拟合曲线）
+- UI 组件一律从 `@/components/ui/*` 导入 shadcn 组件，用 `cn()` 合并 Tailwind 类名；源码中的 `teal-*` 类名（含 `accent-teal-`、`ring-teal-`）被 `src/index.css` 强制映射为赤陶色（`#c15f3c`），页眉浅灰 `text-slate-400/500` 映射为 `#6f6a62`，图表 SVG 颜色直接写死 `#c15f3c`（拟合曲线）/`#24221f`（标准品），实际主题色为赤陶（主按钮、选中态、拟合曲线）；孔板热图不使用 `teal-*` 类名，改用 `src/index.css` 中基于 `--heat-1..4` 变量（同一赤陶色系、明度从浅到深）的 `.heat-1` ~ `.heat-4` 专用类名实现四档色阶
 - 纯图标按钮（无可见文本）必须添加 `aria-label`
 - TypeScript 严格模式生效：`noUnusedLocals`、`noUnusedParameters`、`verbatimModuleSyntax`、`erasableSyntaxOnly`
 - `eslint.config.js` 对 `src/components/ui/**`（shadcn 生成代码）关闭了 `react-refresh/only-export-components` 与 `react-hooks/purity` 两条规则，属有意豁免，不要为通过 lint 去改这些生成文件
@@ -100,6 +100,10 @@ npm run test       # Vitest 单元测试（src/lib/*.test.ts）
 `YDchen Tools` 文字页眉是受保护的品牌区域，必须保持原结构、尺寸与样式；项目专属统一标志 `public/project-mark.svg` 仅用于 favicon 或现有非页眉标志，不得改变页面布局。
 
 ---
+
+## 2026-09-13 维护补充
+
+PlateRowLabels 高度、PlateColNumbers 宽度及录入/结果孔格宽度需联动。对数刻度按图表正值范围生成十进制幂，不修改拟合算法。浅色 teal 背景不能统一映射成深色按钮背景。
 
 ## AI 维护提醒
 

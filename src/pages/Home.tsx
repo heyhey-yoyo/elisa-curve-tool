@@ -49,10 +49,10 @@ const emptyPlate = (): PlateCell[][] =>
 function cellStyle(v: number | null, min: number, max: number): string {
   if (v === null) return 'bg-white text-slate-300'
   const t = max > min ? (v - min) / (max - min) : 0.5
-  if (t > 0.66) return 'bg-teal-600 text-white'
-  if (t > 0.33) return 'bg-teal-400 text-teal-950'
-  if (t > 0.1) return 'bg-teal-200 text-teal-950'
-  return 'bg-teal-50 text-teal-900'
+  if (t > 0.66) return 'heat-4'
+  if (t > 0.33) return 'heat-3'
+  if (t > 0.1) return 'heat-2'
+  return 'heat-1'
 }
 
 /**
@@ -115,7 +115,7 @@ function PlateColNumbers() {
   return (
     <div className="flex gap-0.5 sm:gap-1 mb-0.5 sm:mb-1">
       {COLS.map((c) => (
-        <div key={c} className="w-[47px] sm:w-[73px] shrink-0 text-center text-[10px] sm:text-xs text-slate-400">{c}</div>
+        <div key={c} className="w-[56px] sm:w-[73px] shrink-0 text-center text-[10px] sm:text-xs text-slate-400">{c}</div>
       ))}
     </div>
   )
@@ -263,8 +263,9 @@ export default function Home() {
   }
   // 标准品数据点
   const stdPoints = useMemo(() => deriveStandardPoints(stds, blankSub), [stds, blankSub])
-  const minC = useMemo(() => Math.min(...stdPoints.pts.map((p) => p.conc)), [stdPoints])
-  const maxC = useMemo(() => Math.max(...stdPoints.pts.map((p) => p.conc)), [stdPoints])
+  // 空数组时 Math.min/max 展开会得到 ±Infinity，显式防护为 NaN（无有效标准点时 fit 恒为 null，下游不会渲染）
+  const minC = useMemo(() => (stdPoints.pts.length ? Math.min(...stdPoints.pts.map((p) => p.conc)) : NaN), [stdPoints])
+  const maxC = useMemo(() => (stdPoints.pts.length ? Math.max(...stdPoints.pts.map((p) => p.conc)) : NaN), [stdPoints])
   /** 当前标准品输入签名：基于原始输入（stds + blankSub），任何输入变化立即失效 */
   const currentSig = useMemo(() => JSON.stringify({ stds, blankSub }), [stds, blankSub])
   /** 签名不一致时旧拟合立即失效，不再展示旧曲线、参数与样本换算结果 */
@@ -321,7 +322,10 @@ export default function Home() {
     const scatter = stdPoints.pts.map((p) => ({ conc: p.conc, od: p.od }))
     const curve = curvePoints(fit.params, lo * 0.5, hi * 2)
     const unkDots = computeChartUnkDots(unkRows, fit, blankSub, stdPoints.blank, lo, hi)
-    return { scatter, curve, unkDots, lo, hi }
+    const firstDecade = Math.ceil(Math.log10(lo * 0.4))
+    const lastDecade = Math.floor(Math.log10(hi * 3))
+    const ticks = Array.from({ length: Math.max(0, lastDecade - firstDecade + 1) }, (_, i) => 10 ** (firstDecade + i))
+    return { scatter, curve, unkDots, lo, hi, ticks }
   }, [fit, stdPoints, unkRows, blankSub])
   // 回算表
   const backCalc = useMemo(
@@ -615,7 +619,7 @@ export default function Home() {
                         dataKey="conc"
                         scale="log"
                         domain={[chartData.lo * 0.4, chartData.hi * 3]}
-                        ticks={[minC, maxC]}
+                        ticks={chartData.ticks}
                         tickFormatter={(v: number) => fmt(v)}
                         tick={{ fontSize: 11 }}
                         label={{ value: `浓度 (${unit})`, position: 'insideBottom', offset: -12, fontSize: 12 }}
@@ -801,7 +805,7 @@ export default function Home() {
                   </div>
                   <div className="flex -mx-2 px-2 sm:mx-0 sm:px-0">
                     {/* 固定行标列（不随孔板滚动） */}
-                    <PlateRowLabels cellHeightCls="h-9" />
+                    <PlateRowLabels cellHeightCls="h-11 sm:h-9" />
                     {/* 可滚动孔格区 */}
                     <div ref={odBoardRef} onScroll={syncScroll('od')} className="overflow-x-auto pb-2 flex-1">
                       <div className="inline-block">
@@ -847,7 +851,7 @@ export default function Home() {
                                   onChange={(e) => updatePlateCell(r, c, entryMode, e.target.value)}
                                   onFocus={() => setSelectedCell({ r, c })}
                                   onKeyDown={onOdCellKeyDown(r, c)}
-                                  className={`w-[47px] h-9 sm:w-[73px] sm:h-9 shrink-0 text-[10px] sm:text-xs text-center border rounded ${entryMode === 'group' ? '' : 'font-mono'} px-0.5 outline-none placeholder:text-slate-300 ${baseCls} ${selected ? 'ring-2 ring-inset ring-teal-600' : ''}`}
+                                  className={`w-[56px] h-11 sm:w-[73px] sm:h-9 shrink-0 text-xs text-center border rounded ${entryMode === 'group' ? '' : 'font-mono'} px-0.5 outline-none placeholder:text-slate-300 ${baseCls} ${selected ? 'ring-2 ring-inset ring-teal-600' : ''}`}
                                 />
                               )
                             })}
@@ -916,7 +920,7 @@ export default function Home() {
                                 type="button"
                                 onClick={() => focusOdCell(r, c)}
                                 title={`${ROWS[r]}${c + 1}${group ? ` · ${group}` : ''} · ${statusText || text}`}
-                                className={`w-[47px] h-12 sm:w-[73px] sm:h-14 shrink-0 flex flex-col items-center justify-center gap-0.5 border rounded px-0.5 overflow-hidden ${cls} ${selected ? 'ring-2 ring-inset ring-teal-600' : ''}`}
+                                className={`w-[56px] h-12 sm:w-[73px] sm:h-14 shrink-0 flex flex-col items-center justify-center gap-0.5 border rounded px-0.5 overflow-hidden ${cls} ${selected ? 'ring-2 ring-inset ring-teal-600' : ''}`}
                               >
                                 <span className="w-full text-[8px] sm:text-[10px] leading-tight opacity-80 break-all line-clamp-2">
                                   {group || ' '}

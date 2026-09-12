@@ -86,6 +86,12 @@ body{font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI"
 #root main [class*="border-teal-"]{border-color:rgba(193,95,60,.35)!important}
 #root main [class*="accent-teal-"]{accent-color:#c15f3c!important}
 #root main [class*="ring-teal-"]{--tw-ring-color:rgba(193,95,60,.5)!important}
+/* 孔板热图四档色阶：同一赤陶色系下四个可区分明度（--heat-1 最浅 → --heat-4 最深），专用类名不波及其他 teal 组件 */
+:root{--heat-1:#f0ded4;--heat-2:#d99a7d;--heat-3:#c15f3c;--heat-4:#8f4326}
+#root main .heat-1{background-color:var(--heat-1)!important;color:#7f3b27!important}
+#root main .heat-2{background-color:var(--heat-2)!important;color:#7f3b27!important}
+#root main .heat-3{background-color:var(--heat-3)!important;color:#fbf8f2!important}
+#root main .heat-4{background-color:var(--heat-4)!important;color:#fbf8f2!important}
 #root main [class*="bg-slate-50"],#root main [class*="bg-slate-100"]{background-color:#ebe4d8!important}
 #root main [class*="text-slate-900"],#root main [class*="text-slate-800"]{color:#24221f!important}
 #root main [class*="text-slate-500"],#root main [class*="text-slate-400"]{color:#6f6a62!important}
@@ -104,3 +110,7 @@ body{font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI"
 #root main .copy-concentration-button.is-copied{background:#edf4ee!important;border-color:#357b56!important;color:#24603f!important}
 #root main .copy-concentration-button:disabled{background:#ebe4d8!important;border-color:rgba(36,34,31,.18)!important;color:#6f6a62!important;opacity:1}
 #root main .copy-concentration-button svg{color:currentColor}
+
+/* 浅色孔格与实心操作按钮分别映射，避免深底叠加深色数值。 */
+#root main [class~="bg-teal-50"]{background-color:#f0ded4!important;color:#7f3b27!important}
+#root main [class~="bg-teal-100"]{background-color:#f0ded4!important;color:#7f3b27!important}

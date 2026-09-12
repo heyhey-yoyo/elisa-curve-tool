@@ -319,10 +319,10 @@ export function fitFourPL(points: StandardPoint[]): FitResult | null {
   }
 
   // 多起点：自动初值 + 不同 c 位置 × 两个曲线方向 × 不同斜率（b 恒正）
-  // OD 归一化（除以正数 yScale）不改变最值，直接复用 validODs
+  // LM 在归一化（÷yScale）数据上拟合，网格起点的 a/d 必须与归一化尺度一致
   const g = initialGuess(scaled)
-  const minOD = Math.min(...validODs)
-  const maxOD = Math.max(...validODs)
+  const minOD = Math.min(...ys)
+  const maxOD = Math.max(...ys)
 
   const starts: [number, number, number, number][] = [
     [g.a, Math.log(g.b), Math.log(g.c), g.d],

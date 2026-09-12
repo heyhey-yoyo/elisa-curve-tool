@@ -74,33 +74,81 @@
   }
 }
 /* Portfolio visual system for the tool body. The YDchen Tools header is intentionally unchanged. */
-:root{--background:38 33% 93%;--foreground:30 7% 14%;--card:40 100% 99%;--card-foreground:30 7% 14%;--popover:40 100% 99%;--popover-foreground:30 7% 14%;--primary:14 54% 50%;--primary-foreground:40 100% 99%;--secondary:34 28% 89%;--secondary-foreground:30 7% 14%;--muted:34 28% 89%;--muted-foreground:29 7% 42%;--accent:14 54% 50%;--accent-foreground:40 100% 99%;--border:30 12% 78%;--input:30 12% 78%;--ring:14 54% 50%;--radius:0rem}
-body{font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;background:#f3eee5}
+:root{
+  --background:38 33% 93%;
+  --foreground:30 7% 14%;
+  --card:40 100% 99%;
+  --card-foreground:30 7% 14%;
+  --popover:40 100% 99%;
+  --popover-foreground:30 7% 14%;
+  --primary:14 54% 50%;
+  --primary-foreground:40 100% 99%;
+  --secondary:34 28% 89%;
+  --secondary-foreground:30 7% 14%;
+  --muted:34 28% 89%;
+  --muted-foreground:29 8% 36%;
+  --accent:14 54% 50%;
+  --accent-foreground:40 100% 99%;
+  --border:30 12% 78%;
+  --input:30 12% 78%;
+  --ring:14 54% 50%;
+  --radius:0rem;
+  --heat-1:#f0ded4;
+  --heat-2:#d99a7d;
+  --heat-3:#a94f31;
+  --heat-4:#8f4326;
+  --type-body:-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", Arial, sans-serif;
+  --type-heading:Georgia, "Times New Roman", "Songti SC", "STSong", serif;
+  --type-mono:"SFMono-Regular", Consolas, "Liberation Mono", "Microsoft YaHei", monospace;
+  --size-meta:.75rem;
+  --size-small:.8125rem;
+  --size-label:.875rem;
+  --size-control:.9375rem;
+  --size-body:1rem;
+  --size-subheading:1.125rem;
+  --size-section:1.25rem;
+  --size-heading:1.5rem;
+  --brand-accent:#a94f31;
+  --brand-paper:#f3eee5;
+  --brand-ink:#24221f;
+  --brand-muted:#5f5a53;
+  --brand-pad:clamp(16px,4.5vw,72px);
+  font-size:16px
+}
+body{background:#f3eee5}
 #root>div{background:#f3eee5!important;color:#24221f}
 #root>div>main{max-width:1440px!important;padding-left:clamp(22px,4.5vw,72px)!important;padding-right:clamp(22px,4.5vw,72px)!important}
 #root main [data-slot="card"]{background:rgba(255,252,247,.84)!important;border-color:rgba(36,34,31,.18)!important;border-radius:0!important;box-shadow:none!important}
-#root main h2,#root main h3{font-family:Georgia,"Times New Roman","Songti SC","STSong",serif;font-weight:400}
-#root main input,#root main button,#root main select,#root main textarea{border-radius:0}
-#root main [class*="bg-teal-"]{background-color:#c15f3c!important}
+#root main h2{font-family:var(--type-heading);font-weight:400}
+#root main h3{font-family:var(--type-heading);font-weight:400}
+#root main input{border-radius:0}
+#root main button{border-radius:0}
+#root main select{border-radius:0}
+#root main textarea{border-radius:0}
+#root main [class~="bg-teal-600"]{background-color:#a94f31!important}
+#root main [class~="hover:bg-teal-700"]:hover{background-color:#823a25!important}
+#root main [class~="bg-teal-50/40"]{background-color:rgba(240,222,212,.4)!important}
 #root main [class*="text-teal-"]{color:#a94f31!important}
-#root main [class*="border-teal-"]{border-color:rgba(193,95,60,.35)!important}
-#root main [class*="accent-teal-"]{accent-color:#c15f3c!important}
-#root main [class*="ring-teal-"]{--tw-ring-color:rgba(193,95,60,.5)!important}
+#root main [class*="border-teal-"]{border-color:rgba(169,79,49,.35)!important}
+#root main [class*="accent-teal-"]{accent-color:#a94f31!important}
+#root main [class*="ring-teal-"]{--tw-ring-color:rgba(169,79,49,.5)!important}
 /* 孔板热图四档色阶：同一赤陶色系下四个可区分明度（--heat-1 最浅 → --heat-4 最深），专用类名不波及其他 teal 组件 */
-:root{--heat-1:#f0ded4;--heat-2:#d99a7d;--heat-3:#c15f3c;--heat-4:#8f4326}
 #root main .heat-1{background-color:var(--heat-1)!important;color:#7f3b27!important}
 #root main .heat-2{background-color:var(--heat-2)!important;color:#7f3b27!important}
 #root main .heat-3{background-color:var(--heat-3)!important;color:#fbf8f2!important}
 #root main .heat-4{background-color:var(--heat-4)!important;color:#fbf8f2!important}
-#root main [class*="bg-slate-50"],#root main [class*="bg-slate-100"]{background-color:#ebe4d8!important}
-#root main [class*="text-slate-900"],#root main [class*="text-slate-800"]{color:#24221f!important}
-#root main [class*="text-slate-500"],#root main [class*="text-slate-400"]{color:#6f6a62!important}
+#root main [class*="bg-slate-50"]{background-color:#ebe4d8!important}
+#root main [class*="bg-slate-100"]{background-color:#ebe4d8!important}
+#root main [class*="text-slate-900"]{color:#24221f!important}
+#root main [class*="text-slate-800"]{color:#24221f!important}
+#root main [class*="text-slate-500"]{color:#5f5a53!important}
+#root main [class*="text-slate-400"]{color:#5f5a53!important}
 #root main [class*="border-slate-"]{border-color:rgba(36,34,31,.18)!important}
-#root header [class*="text-slate-400"],#root header [class*="text-slate-500"]{color:#6f6a62!important}
+#root header [class*="text-slate-400"]{color:#5f5a53!important}
+#root header [class*="text-slate-500"]{color:#5f5a53!important}
 
 /* Visual QA baseline for the tool body; the protected YDchen Tools header is untouched. */
-:root{--muted-foreground:29 8% 36%}
-#root main{font-size:15px}
+#root main{font-size:var(--size-control)}
 #root main [class~="text-xs"]{font-size:.8125rem!important}
 #root main [class~="text-sm"]{font-size:.9rem!important}
 
@@ -108,9 +156,22 @@ body{font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI"
 #root main .copy-concentration-button{background:#fbf8f2!important;border:1px solid #a94f31!important;color:#7f3b27!important}
 #root main .copy-concentration-button:hover:not(:disabled){background:#f0ded4!important;color:#6e2f20!important}
 #root main .copy-concentration-button.is-copied{background:#edf4ee!important;border-color:#357b56!important;color:#24603f!important}
-#root main .copy-concentration-button:disabled{background:#ebe4d8!important;border-color:rgba(36,34,31,.18)!important;color:#6f6a62!important;opacity:1}
+#root main .copy-concentration-button:disabled{background:#ebe4d8!important;border-color:rgba(36,34,31,.18)!important;color:#5f5a53!important;opacity:1}
 #root main .copy-concentration-button svg{color:currentColor}
 
 /* 浅色孔格与实心操作按钮分别映射，避免深底叠加深色数值。 */
 #root main [class~="bg-teal-50"]{background-color:#f0ded4!important;color:#7f3b27!important}
 #root main [class~="bg-teal-100"]{background-color:#f0ded4!important;color:#7f3b27!important}
+/* 全项目共用字体层级；页眉另按 Tools、普通项目与个人主页分组。 */
+body{font-family:var(--type-body);font-size:var(--size-body);line-height:1.6}
+
+/* Tools 品牌页眉：桌面 72px、手机 64px 起，附加管理操作独立换行。 */
+#root .site-header{min-height:72px;height:auto;padding:0;border-bottom:1px solid rgba(36,34,31,.18);background:rgba(255,252,247,.94)}
+#root .site-header .header-inner{width:100%;max-width:1280px;min-height:71px;margin:0 auto;padding:12px 16px;display:flex;align-items:center;gap:16px}
+#root .site-header .header-brand{display:flex;align-items:baseline;flex:0 0 auto;white-space:nowrap;line-height:1}
+#root .site-header .brand-bold{font-family:var(--type-heading);font-size:20px;font-weight:600;line-height:1;letter-spacing:-.025em;color:var(--brand-ink)}
+#root .site-header .brand-light{font-family:var(--type-body);font-size:20px;font-weight:300;line-height:1;margin-left:6px;letter-spacing:0;color:var(--brand-muted)}
+#root .site-header .header-divider{display:block;flex:0 0 1px;width:1px;height:36px;background:rgba(36,34,31,.2)}
+#root .site-header .header-info{min-width:0;flex:1}
+#root .site-header .header-info h1{margin:0;font-family:var(--type-body);font-size:18px;font-weight:600;line-height:1.4;letter-spacing:0;color:var(--brand-ink);white-space:normal;overflow-wrap:anywhere}
+@media(max-width:640px){#root .site-header{min-height:64px}#root .site-header .header-inner{min-height:63px;gap:12px;padding:12px 16px}#root .site-header .brand-bold{font-size:18px}#root .site-header .brand-light{font-size:18px}#root .site-header .header-divider{height:32px}#root .site-header .header-info h1{font-size:16px}}

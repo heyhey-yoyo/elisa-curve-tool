@@ -474,14 +474,14 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-[#F7F4EE]">
       {/* 头部：极简学术风品牌栏 */}
-      <header className="border-b border-slate-200/80 bg-white/70 backdrop-blur">
-        <div className="max-w-7xl mx-auto px-3 sm:px-4 py-3 sm:py-4 flex items-center gap-3 sm:gap-4">
-          <div className="shrink-0 leading-none">
-            <span className="font-serif text-lg sm:text-xl font-semibold tracking-tight text-slate-900">YDchen</span>
-            <span className="ml-1.5 text-lg sm:text-xl font-light text-slate-400">Tools</span>
+      <header className="site-header border-b border-slate-200/80 bg-white/70 backdrop-blur">
+        <div className="header-inner max-w-7xl mx-auto px-3 sm:px-4 py-3 sm:py-4 flex items-center gap-3 sm:gap-4">
+          <div className="header-brand shrink-0 leading-none">
+            <span className="brand-bold font-serif text-lg sm:text-xl font-semibold tracking-tight text-slate-900">YDchen</span>
+            <span className="brand-light ml-1.5 text-lg sm:text-xl font-light text-slate-400">Tools</span>
           </div>
-          <div className="w-px h-8 sm:h-9 bg-slate-300/80 shrink-0" aria-hidden="true" />
-          <div className="min-w-0">
+          <div className="header-divider w-px h-8 sm:h-9 bg-slate-300/80 shrink-0" aria-hidden="true" />
+          <div className="header-info min-w-0">
             <h1 className="text-base sm:text-lg font-semibold text-slate-800 leading-tight">ELISA 4PL Curve Tool</h1>
           </div>
         </div>

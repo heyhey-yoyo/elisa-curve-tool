@@ -1,31 +1,9 @@
-Using Node.js 20, Tailwind CSS v3.4.19, and Vite v7.2.4
+# 技术环境索引
 
-Tailwind CSS has been set up with the shadcn theme
+本文件替代旧脚手架安装日志；不再使用生成环境中的 /mnt/agents/output/app 路径或旧依赖版本。
 
-Setup complete: /mnt/agents/output/app
-
-Components (40+):
-  accordion, alert-dialog, alert, aspect-ratio, avatar, badge, breadcrumb,
-  button-group, button, calendar, card, carousel, chart, checkbox, collapsible,
-  command, context-menu, dialog, drawer, dropdown-menu, empty, field, form,
-  hover-card, input-group, input-otp, input, item, kbd, label, menubar,
-  navigation-menu, pagination, popover, progress, radio-group, resizable,
-  scroll-area, select, separator, sheet, sidebar, skeleton, slider, sonner,
-  spinner, switch, table, tabs, textarea, toggle-group, toggle, tooltip
-
-Usage:
-  import { Button } from '@/components/ui/button'
-  import { Card, CardHeader, CardTitle } from '@/components/ui/card'
-
-Structure:
-  src/sections/        Page sections
-  src/hooks/           Custom hooks
-  src/types/           Type definitions
-  src/App.css          Styles specific to the Webapp
-  src/App.tsx          Root React component
-  src/index.css        Global styles
-  src/main.tsx         Entry point for rendering the Webapp
-  index.html           Entry point for the Webapp
-  tailwind.config.js   Configures Tailwind's theme, plugins, etc.
-  vite.config.ts       Main build and dev server settings for Vite
-  postcss.config.js    Config file for CSS post-processing tools
+- 应用：React、TypeScript、Vite、Tailwind、shadcn/Radix 组件；依赖与实际锁定版本见 package.json 和 package-lock.json。
+- 安装使用 npm ci；Node 需满足锁定 Vite 的 engines，建议使用与项目构建环境一致的 Node 22.12+。
+- 入口：index.html、src/main.tsx、src/App.tsx；全局样式 src/index.css，组件 src/components/。
+- 开发 npm run dev；检查 npm run lint、npm test；生产构建 npm run build；产物在 dist/。
+- 工具说明见 [README.md](./README.md)，模块、拟合计算、热图和维护约束见 [AGENTS.md](./AGENTS.md)。

@@ -39,7 +39,7 @@
 | `src/hooks/use-mobile.ts` | shadcn 附带的移动端断点 hook |
 | `src/components/ui/` | shadcn/ui 生成的基础组件，勿手写修改，通过 shadcn CLI 增删 |
 | `index.html` | Vite 入口 HTML |
-| `src/index.css` | Tailwind 指令 + 主题 CSS 变量（:root / .dark；含暖米白/赤陶色变量覆盖、`teal-*` → 赤陶色强制映射与热图 `--heat-1..4` 色阶变量） |
+| `src/index.css` | Tailwind 指令 + 主题 CSS 变量（:root / .dark；含暖米白/赤陶色变量覆盖、普通 teal 控件的赤陶色兼容映射与热图 `--heat-1..4` 色阶变量） |
 | `src/App.css` | 少量全局样式 |
 | `public/project-mark.svg` | 项目专属标志（favicon） |
 | `package.json` / `package-lock.json` | npm 清单与锁定依赖 |
@@ -65,14 +65,34 @@ npm run test       # Vitest 单元测试（src/lib/*.test.ts）
 
 项目使用 **Vitest**（`npm run test` / `vitest run`），测试分布在 `src/lib/` 下的四个测试文件：`fourPL.test.ts`（4PL 正/反函数、拟合、平坦拒绝、签名）、`parsing.test.ts`（数字解析）、`standards.test.ts`（行校验、平坦拒绝）、`sample.test.ts`（浓度计算、板结果）。页面层无组件测试，UI 改动通过 `npm run build` + `npm run lint` + 手动运行 `npm run dev` 验证；修改算法后必须保证测试全绿，并用页面内置示例数据（`EXAMPLE_STDS`，R² 应 ≥ 0.99）回归验证。
 
+维护回归入口（各项通过后仍需按改动范围验证浏览器关键路径）：
+
+```bash
+npm run lint
+npm test
+npm run build
+```
+
 ## 代码组织与风格约定
 
 - **代码注释与 UI 文案使用中文**；标识符、类型名用英文
 - 一律使用 `@/` 路径别名导入（如 `@/components/ui/button`、`@/lib/fourPL`），不用相对路径跨目录引用
-- UI 组件一律从 `@/components/ui/*` 导入 shadcn 组件，用 `cn()` 合并 Tailwind 类名；源码中的 `teal-*` 类名（含 `accent-teal-`、`ring-teal-`）被 `src/index.css` 强制映射为赤陶色（`#c15f3c`），页眉浅灰 `text-slate-400/500` 映射为 `#6f6a62`，图表 SVG 颜色直接写死 `#c15f3c`（拟合曲线）/`#24221f`（标准品），实际主题色为赤陶（主按钮、选中态、拟合曲线）；孔板热图不使用 `teal-*` 类名，改用 `src/index.css` 中基于 `--heat-1..4` 变量（同一赤陶色系、明度从浅到深）的 `.heat-1` ~ `.heat-4` 专用类名实现四档色阶
+- UI 组件从 `@/components/ui/*` 引入，用 `cn()` 合并类名；普通按钮、文字和边框的兼容映射位于 `src/index.css`。热图使用独立 `.heat-1` 至 `.heat-4` 及 `--heat-1..4`，禁止用广泛的 bg-teal 子串规则覆盖不同浓度。拟合曲线和标准点保持可区分，修改图表颜色时核对实际渲染与图例。
 - 纯图标按钮（无可见文本）必须添加 `aria-label`
 - TypeScript 严格模式生效：`noUnusedLocals`、`noUnusedParameters`、`verbatimModuleSyntax`、`erasableSyntaxOnly`
 - `eslint.config.js` 对 `src/components/ui/**`（shadcn 生成代码）关闭了 `react-refresh/only-export-components` 与 `react-hooks/purity` 两条规则，属有意豁免，不要为通过 lint 去改这些生成文件
+
+本项目为 Tools 工具类。页眉桌面 72px、手机（≤640px）64px；YDchen 为衬线 20px/600，Tools 为无衬线 20px/300，手机字标 18px；标题 18px/600、手机 16px；分隔线 36px/32px，品牌、分隔线与标题间距 16px/12px。
+
+页眉内容区最大宽度 1280px（含两侧各 16px 内边距），整体居中；品牌和标题靠左，操作区靠右，窄屏换行后仍保持该对齐。品牌页眉在文档顶部正常排布，随页面滚走，不固定或吸顶；表格内部表头、侧边工具和手机底部导航可按功能保留。
+
+正文采用统一系统无衬线字体，默认 16px / 1.6；标题采用 Georgia、Times New Roman、Songti SC、STSong 衬线族。数字与代码可使用 SFMono-Regular、Consolas、Liberation Mono、Microsoft YaHei 等宽族。按钮和输入通常 15px，辅助文字 12–14px，密集科学数据允许有理由的局部调整。页面底色 #f3eee5、正文 #24221f、赤陶强调 #a94f31，柔和底色上的强调文字 #823a25；科学分类色、热图、作品主题与状态色保留必要区分度。
+
+主样式保留一个顶层 `:root`，条件规则和深色画布局部令牌独立维护，不再叠加整套旧深色主题与末尾浅色覆盖。修改视觉后核对实际渲染字体、字号、间距、对比度和操作可达性；至少检查 1440、820、390px，涉及断点时补查两侧宽度，涉及画布或存储时补查交互。构建、单测、本地浏览器和线上部署分别记录；发布后禁用缓存/硬刷新，并核对实际资源版本。
+
+PlateRowLabels 高度、PlateColNumbers 宽度及录入/结果孔格宽度需联动。对数刻度按图表正值范围生成十进制幂，不修改拟合算法。浅色 teal 背景不能统一映射成深色按钮背景。
+
+工具页眉统一；四档热图继续使用独立 heat 类。移除过宽的背景 teal 匹配，半透明公式区保持浅色，实色按钮和悬停颜色分别处理；浏览器验证拟合、热图、孔板尺寸和键盘移动。
 
 ## 部署
 
@@ -93,34 +113,13 @@ npm run test       # Vitest 单元测试（src/lib/*.test.ts）
 
 ## 界面维护约定
 
-页面主体使用 `ydchen-portfolio` 的米白 / 赤陶色视觉系统；`YDchen Tools` 页眉是受保护的品牌区域，后续视觉调整不得改变其结构、字体、颜色或布局。视觉验收以工具主体 15px、操作与结果标签不小于 13px 为基线；在 1440px 桌面与 390px 手机视口检查整体横向溢出，字号覆盖必须限定在 `main` 内。
+页面主体使用 `ydchen-portfolio` 的米白 / 赤陶色视觉系统；`YDchen Tools` 页眉是品牌区域，后续视觉调整须遵循本文件的工具类统一基准。视觉验收以工具主体 16px、操作与结果标签不小于 13px 为基线；在 1440px 桌面与 390px 手机视口检查整体横向溢出，字号覆盖必须限定在 `main` 内。
 
 ## 标志维护约定
 
 `YDchen Tools` 文字页眉是受保护的品牌区域，必须保持原结构、尺寸与样式；项目专属统一标志 `public/project-mark.svg` 仅用于 favicon 或现有非页眉标志，不得改变页面布局。
 
 ---
-
-## 2026-09-13 维护补充
-
-PlateRowLabels 高度、PlateColNumbers 宽度及录入/结果孔格宽度需联动。对数刻度按图表正值范围生成十进制幂，不修改拟合算法。浅色 teal 背景不能统一映射成深色按钮背景。
-
-
-## 跨项目视觉与回归基准（2026-09-13）
-
-本项目归类为 **Tools**。72px / 64px 页眉，YDchen Tools 文字字标，标题 18px / 16px。 正文采用统一系统无衬线字体、默认 16px / 1.6；标题使用衬线层级，数字与代码可使用统一等宽族。辅助文字通常为 12–14px，密集科学数据可按实际场景调整。主界面延续米白与赤陶 #a94f31，柔和色块上的文字用更深色保证可读性。
-
-工具页眉统一；四档热图继续使用独立 heat 类。移除过宽的背景 teal 匹配，半透明公式区保持浅色，实色按钮和悬停颜色分别处理；浏览器验证拟合、热图、孔板尺寸和键盘移动。
-
-当前检查命令：
-
-```bash
-npm run lint
-npm test
-npm run build
-```
-
-本节为当前视觉维护基准，替代此前分散的字号、页眉尺寸和 QA 颜色例外；不要重新添加全局深色主题与末尾浅色覆盖。保留一个顶层 `:root`，条件规则和深色图形舞台局部令牌保持独立。修改后至少核验 1440、820、390px，涉及断点、图表或存储时补查相应交互。构建、单测、浏览器本地和线上部署是不同验收层次，记录其实际范围。
 
 ## AI 维护提醒
 

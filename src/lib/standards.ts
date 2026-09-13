@@ -35,7 +35,7 @@ export function deriveStandardPoints(stds: StdRow[], blankSub: boolean): Standar
 export function validateStandards(pts: StandardPoint[]): string | null {
   const uniqueConcs = new Set(pts.map((p) => p.conc))
   if (uniqueConcs.size < 5) {
-    return '至少需要 5 个不同的标准品浓度（重复孔不算作新的浓度水平）。'
+    return '至少需要 5 个不同的正浓度标准品水平（浓度 > 0；零浓度空白与重复孔不增加浓度水平）。'
   }
 
   // OD 完全没有变化时，4PL 的上下渐近线重合，反函数无法计算任何浓度。

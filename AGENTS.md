@@ -14,7 +14,7 @@
 ## 技术栈与运行架构
 
 - **React 19 + TypeScript（strict）+ Vite 7**（`@vitejs/plugin-react`，dev 端口 3000，`base: './'` 支持相对路径部署）
-- **路由**：react-router v7（`BrowserRouter`，目前仅 `/` 一条路由）
+- **页面入口**：`App` 直接渲染 `Home`，不使用客户端路径路由；构建资源采用相对 URL，根目录和子目录入口共用同一页面
 - **UI**：shadcn/ui（new-york 风格，组件已生成在 `src/components/ui/`，共 50+ 个）+ Radix UI primitives + Tailwind CSS v3.4（CSS 变量主题；shadcn 默认 slate 主题已被 `src/index.css` 的 ydchen-portfolio 暖米白/赤陶色变量覆盖）+ lucide-react 图标 + tailwindcss-animate
 - **图表**：recharts v2
 - **其他**：zod / react-hook-form / @hookform/resolvers（shadcn form 组件的配套依赖，业务代码暂未使用）
@@ -24,8 +24,8 @@
 
 | 文件 | 作用 |
 | --- | --- |
-| `src/main.tsx` | 入口：createRoot + StrictMode + BrowserRouter |
-| `src/App.tsx` | 路由表（目前只有 / → Home） |
+| `src/main.tsx` | 入口：createRoot + StrictMode |
+| `src/App.tsx` | 直接渲染 Home 的应用入口 |
 | `src/pages/Home.tsx` | 页面组件：状态管理 + UI 渲染，业务逻辑委托给 lib/ 模块；内部含纯展示小组件（PlateRowLabels / PlateColNumbers / CopyButton / SelectedCellPanel）与显示文本助手 |
 | `src/lib/fourPL.ts` | 核心算法：4PL 正/反函数、LM 拟合（fitFourPL）、曲线点生成（curvePoints）、数字格式化（fmt）、公式生成（formula）、EC50 位置诊断（FitDiagnostics） |
 | `src/lib/fourPL.test.ts` | 算法单元测试（Vitest） |
@@ -59,7 +59,7 @@ npm run lint       # ESLint 检查（eslint.config.js，flat config）
 npm run test       # Vitest 单元测试（src/lib/*.test.ts）
 ```
 
-要求 Node.js 20。提交代码前请确保 `npm run build`、`npm run lint` 与 `npm run test` 均通过（`build` 中的 `tsc -b` 即类型检查）。保持 `package-lock.json` 与 package 清单同步；安全修复仅接受稳定的兼容版本，不使用 `npm audit fix --force`。
+推荐 Node.js 22（至少 22.12）或 24 及以上版本；也支持 Node.js 20（至少 20.19）。具体范围与 package.json 的 `engines` 一致。提交代码前请确保 `npm run build`、`npm run lint` 与 `npm run test` 均通过（`build` 中的 `tsc -b` 即类型检查）。保持 `package-lock.json` 与 package 清单同步；安全修复仅接受稳定的兼容版本，不使用 `npm audit fix --force`。
 
 ## 测试
 
@@ -74,6 +74,8 @@ npm run build
 ```
 
 ## 代码组织与风格约定
+
+对外版本以 GitHub Release 为准；应用版本来自 `package.json`，发布时与 Release tag 同步。 `package-lock.json` 中的根应用版本同步更新。
 
 - **代码注释与 UI 文案使用中文**；标识符、类型名用英文
 - 一律使用 `@/` 路径别名导入（如 `@/components/ui/button`、`@/lib/fourPL`），不用相对路径跨目录引用
@@ -102,14 +104,15 @@ PlateRowLabels 使用透明背景，不在行字母后绘制白色色块；输�
 
 ## 部署
 
-纯静态站点：`npm run build` 产出 `dist/`，因 `base: './'` 可部署到任意静态托管的任意子路径（Cloudflare Pages、GitHub Pages、对象存储、CDN 等），无需服务端配置（当前只有一条路由，无需 history fallback）。
+纯静态站点：`npm run build` 产出 `dist/`，`base: './'` 生成相对资源 URL，`App` 直接渲染页面。支持根目录、带末尾斜杠的子目录和对应 `index.html` 入口；托管服务需正常提供静态文件，不要求 history fallback。修改入口后验证上述三类地址，不能仅凭资源相对路径断言路由可用。
 
 ## 安全与数据注意事项
 
 - 应用不发送网络请求、不存储用户数据、不使用 Cookie / localStorage，无认证逻辑，无环境变量 / 密钥；浏览器剪贴板写入带有 `execCommand` 降级方案（见 `copyText`）
 - 算法正确性是本项目的核心价值：修改 `src/lib/fourPL.ts` 前请理解 LM 迭代、解析雅可比（`modelWithGrad`，替换了有限差分）、多起点策略与拟合后 EC50 诊断。Logistic 计算统一走数值稳定的 `stableW`（`fourPL` 与 `model` 共用）与 `stablePair`（仅 `modelWithGrad` 使用），分支形式避免 `exp(s)` 溢出 / 下溢产生 NaN；`modelWithGrad` 内 NaN 与 |s|>700 的特判是刻意的（梯度在渐近线处归零），不要用通用公式替换
 - `fourPLInverse` 对超出渐近线区间的 OD 返回 `null`，页面据此显示「无法计算 / N/A」——新增逻辑请保持这一约定
-- `fitFourPL` 要求至少 5 个**不同**的浓度（复孔不计入）；标准品 OD 必须存在响应变化（`Math.max(ods) !== Math.min(ods)`），平坦数据直接返回 null。`validateStandards` 也包含相同检查并给出明确中文错误提示
+- `fitFourPL` 要求至少 5 个**不同的正浓度**水平（>0，复孔不增加水平，零浓度空白不参与拟合）；标准品 OD 必须存在响应变化（`Math.max(ods) !== Math.min(ods)`），平坦数据直接返回 null。`validateStandards` 也包含相同检查并给出明确中文错误提示
+- `validateStandardRows` 只跳过浓度和 OD 双空行；启用空白校正要求恰有一条有效零浓度行，关闭时允许零条，但两种设置都拒绝多条零浓度行。孔板 OD/稀释模式支持方向键跨孔，分组模式保留方向键移动文字光标；Enter 在三种模式下均下移并在底部转入下一列。
 - `FitResult.converged` / `reason` 是真实的收敛状态（tolerance / max-iterations / singular / no-improvement）：未收敛的结果页面不得作为有效拟合展示，也不用于样本浓度计算
 - `FitResult.diagnostics.ec50Location` 为拟合后诊断（inside-standard-range / outside-standard-range / extreme），不参与优化过程
 - `FitResult` 不含 `iterations` 字段（多起点迭代总和无参考价值）

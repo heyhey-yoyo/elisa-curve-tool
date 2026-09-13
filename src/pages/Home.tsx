@@ -281,7 +281,7 @@ export default function Home() {
     const res = fitFourPL(stdPoints.pts)
     if (!res) {
       setFitState(null)
-      setFitError('有效标准品数据不足（至少需要 5 个非零浓度的数据点），无法拟合。')
+      setFitError('有效标准品数据不足（至少需要 5 个不同的正浓度标准品水平），无法拟合。')
       return
     }
     if (!res.converged) {
@@ -494,7 +494,7 @@ export default function Home() {
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div>
                   <CardTitle className="text-base">第 1 步 · 标准品数据</CardTitle>
-                  <CardDescription>输入浓度与 OD 值；浓度为 0 的行作为空白孔</CardDescription>
+                  <CardDescription>至少 5 个不同正浓度水平；零浓度仅作空白，启用校正时须恰有一行</CardDescription>
                 </div>
                 <div className="flex gap-2">
                   <Button variant="outline" size="sm" onClick={() => setStds(EXAMPLE_STDS)}>
@@ -783,7 +783,7 @@ export default function Home() {
                 <div>
                   <div className="mb-2 flex flex-wrap items-center gap-3">
                     <h3 className="text-sm font-medium text-slate-700">
-                      孔位录入板 <span className="font-normal text-slate-400">（格内直接输入；方向键 / Enter 切换孔位）</span>
+                      孔位录入板 <span className="font-normal text-slate-400">（格内输入；OD/稀释用方向键跨孔，分组用方向键移动光标；Enter 下移）</span>
                     </h3>
                     {/* 录入模式切换 */}
                     <div className="inline-flex rounded-md border border-slate-200 overflow-hidden">

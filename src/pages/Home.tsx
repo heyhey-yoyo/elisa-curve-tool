@@ -99,7 +99,7 @@ function boardCellDisplay(
 /** 孔板固定行标列（不随孔板滚动）；cellHeightCls 需与对应孔格高度一致 */
 function PlateRowLabels({ cellHeightCls }: { cellHeightCls: string }) {
   return (
-    <div className="shrink-0 z-10 bg-white border-r border-slate-200 pr-1 mr-0.5 sm:mr-1">
+    <div className="shrink-0 z-10 bg-transparent border-r border-slate-200 pr-1 mr-0.5 sm:mr-1">
       <div className="h-[18px] sm:h-[22px] mb-0.5 sm:mb-1" />
       {ROWS.split('').map((letter) => (
         <div key={letter} className={`w-4 sm:w-6 ${cellHeightCls} mb-0.5 sm:mb-1 flex items-center justify-center text-[10px] sm:text-xs text-slate-500 font-medium`}>

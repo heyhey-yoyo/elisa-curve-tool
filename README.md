@@ -36,7 +36,7 @@
 
 ## 本地运行
 
-对外版本以 GitHub Release 为准；应用版本来自 `package.json`，发布时与 Release tag 同步。 `package-lock.json` 中的根应用版本同步更新。
+对外版本以 GitHub Release 为准；应用版本来自 `package.json`，发布时与 Release tag 同步。`package-lock.json` 中的根应用版本同步更新。
 
 推荐 Node.js 22（至少 22.12）或 24 及以上版本；也支持 Node.js 20（至少 20.19）。具体范围与 package.json 的 `engines` 一致。
 
@@ -53,7 +53,7 @@ npm run test    # Vitest 单元测试
 
 ## 部署
 
-纯静态站点。`npm run build` 产出 `dist/`，构建资源采用相对路径，页面可放在域名根目录或子目录（如 `/elisa/`），也可直接访问该目录的 `index.html`。静态托管需能提供这些文件；访问目录时保留末尾 `/`，无需额外的页面路由回退配置。
+纯静态站点，实际部署于 Cloudflare Pages 项目 `elisa-curve-tool`，已接入 Git 集成，推送 `main` 分支自动构建部署（构建命令 `npm run build`，输出目录 `dist`）。`npm run build` 产出 `dist/`，构建资源采用相对路径，页面可放在域名根目录或子目录（如 `/elisa/`），也可直接访问该目录的 `index.html`。静态托管需能提供这些文件；访问目录时保留末尾 `/`，无需额外的页面路由回退配置。
 
 ## License
 

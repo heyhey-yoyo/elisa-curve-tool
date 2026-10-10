@@ -45,6 +45,8 @@
 | `package.json` / `package-lock.json` | npm 清单与锁定依赖 |
 | `LICENSE` | MIT 许可证 |
 | `.gitignore` | Git 忽略规则 |
+| `info.md` | 技术环境索引 |
+| `README.md` / `AGENTS.md` | 用户向项目说明与 AI 代理维护说明 |
 
 关键配置文件：`vite.config.ts`（`@` → `./src` 别名、端口 3000、`base: './'`）、`tailwind.config.js`、`postcss.config.js`、`components.json`（shadcn 配置）、`tsconfig.json` / `tsconfig.app.json`（strict、`@/*` paths）/ `tsconfig.node.json`、`eslint.config.js`。
 
@@ -75,7 +77,7 @@ npm run build
 
 ## 代码组织与风格约定
 
-对外版本以 GitHub Release 为准；应用版本来自 `package.json`，发布时与 Release tag 同步。 `package-lock.json` 中的根应用版本同步更新。
+对外版本以 GitHub Release 为准；应用版本来自 `package.json`，发布时与 Release tag 同步。`package-lock.json` 中的根应用版本同步更新。
 
 - **代码注释与 UI 文案使用中文**；标识符、类型名用英文
 - 一律使用 `@/` 路径别名导入（如 `@/components/ui/button`、`@/lib/fourPL`），不用相对路径跨目录引用
@@ -104,7 +106,7 @@ PlateRowLabels 使用透明背景，不在行字母后绘制白色色块；输�
 
 ## 部署
 
-纯静态站点：`npm run build` 产出 `dist/`，`base: './'` 生成相对资源 URL，`App` 直接渲染页面。支持根目录、带末尾斜杠的子目录和对应 `index.html` 入口；托管服务需正常提供静态文件，不要求 history fallback。修改入口后验证上述三类地址，不能仅凭资源相对路径断言路由可用。
+纯静态站点：实际部署于 Cloudflare Pages 项目 `elisa-curve-tool`（Git 集成，推送 `main` 分支自动构建部署）。`npm run build` 产出 `dist/`，`base: './'` 生成相对资源 URL，`App` 直接渲染页面。支持根目录、带末尾斜杠的子目录和对应 `index.html` 入口；托管服务需正常提供静态文件，不要求 history fallback。修改入口后验证上述三类地址，不能仅凭资源相对路径断言路由可用。
 
 ## 安全与数据注意事项
 

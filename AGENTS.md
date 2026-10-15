@@ -110,7 +110,7 @@ PlateRowLabels 使用透明背景，不在行字母后绘制白色色块；输�
 
 ## 安全与数据注意事项
 
-- 应用不发送网络请求、不存储用户数据、不使用 Cookie / localStorage，无认证逻辑，无环境变量 / 密钥；浏览器剪贴板写入带有 `execCommand` 降级方案（见 `copyText`）
+- 业务代码不发送网络请求、不存储用户数据、不使用 Cookie / localStorage，无认证逻辑，无环境变量 / 密钥；浏览器剪贴板写入带有 `execCommand` 降级方案（见 `copyText`）
 - 算法正确性是本项目的核心价值：修改 `src/lib/fourPL.ts` 前请理解 LM 迭代、解析雅可比（`modelWithGrad`，不使用有限差分）、多起点策略与拟合后 EC50 诊断。Logistic 计算统一走数值稳定的 `stableW`（`fourPL` 与 `model` 共用）与 `stablePair`（仅 `modelWithGrad` 使用），分支形式避免 `exp(s)` 溢出 / 下溢产生 NaN；`modelWithGrad` 内 NaN 与 |s|>700 的特判是刻意的（梯度在渐近线处归零），不要用通用公式替换
 - `fourPLInverse` 对超出渐近线区间的 OD 返回 `null`，页面据此显示「无法计算 / N/A」——新增逻辑请保持这一约定
 - `fitFourPL` 要求至少 5 个**不同的正浓度**水平（>0，复孔不增加水平，零浓度空白不参与拟合）；标准品 OD 必须存在响应变化（`Math.max(ods) !== Math.min(ods)`），平坦数据直接返回 null。`validateStandards` 也包含相同检查并给出明确中文错误提示

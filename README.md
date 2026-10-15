@@ -42,14 +42,12 @@
 
 ```bash
 npm ci          # 按锁文件安装依赖
-npm run dev     # 开发服务器（http://localhost:3000，支持 HMR）
-npm run build   # 生产构建（先 tsc -b 类型检查，再 vite build 输出到 dist/）
+npm run dev     # 开发服务器（http://localhost:3000）
+npm run build   # 生产构建（输出到 dist/）
 npm run preview # 预览生产构建
-npm run lint    # ESLint 检查
-npm run test    # Vitest 单元测试
 ```
 
-提交代码前请确保 `npm run build`、`npm run lint` 与 `npm run test` 均通过。
+发布前的类型检查、ESLint 与单元测试命令见 [AGENTS.md](./AGENTS.md)。
 
 ## 部署
 
